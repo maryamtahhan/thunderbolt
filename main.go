@@ -28,7 +28,7 @@ func getCacheImage(imageName string) error {
 
 func createCacheImage(imageName string) error {
 	// TODO
-	log.Printf("Creating image: %s", imageName)
+	log.Printf("Creating image: %s - Unsupported yet", imageName)
 	return nil
 }
 

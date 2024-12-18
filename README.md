@@ -27,6 +27,11 @@ Flags:
   -i, --image string   OCI image name
 ```
 
+> NOTE: The create option is a work in progress. For now
+to create an OCI image containing a Triton cache directory
+please follow the instructions in
+[spec-compat.md](./spec-compat.md).
+
 ## Triton Cache Image Container Specification
 
 The Triton Cache Image specification defines how to bundle Triton Caches
