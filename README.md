@@ -14,15 +14,15 @@ $ go build
 ## Usage
 
 ```bash
-$ ./thunderbolt  -h
+$  ./thunderbolt -h
 A utility to manage GPU Kernel runtime container images
 
 Usage:
   thunderbolt [flags]
 
 Flags:
-  -c, --create         Create an OCI image
-  -e, --extract        Extract an OCI image
+  -c, --create         Create - TODO
+  -e, --extract        Extract a Triton cache from an OCI image
   -h, --help           help for thunderbolt
   -i, --image string   OCI image name
 ```

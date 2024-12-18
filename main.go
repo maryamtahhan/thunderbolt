@@ -40,7 +40,7 @@ func main() {
 	// Define the CLI command using cobra
 	var rootCmd = &cobra.Command{
 		Use:   "thunderbolt",
-		Short: "A tool to manage GPU Kernel runtime container images",
+		Short: "A utility to manage GPU Kernel runtime container images",
 		Run: func(cmd *cobra.Command, args []string) {
 			if createFlag {
 				if err := createCacheImage(imageName); err != nil {
@@ -62,8 +62,8 @@ func main() {
 
 	// Define the flags for the command-line arguments
 	rootCmd.Flags().StringVarP(&imageName, "image", "i", "", "OCI image name")
-	rootCmd.Flags().BoolVarP(&createFlag, "create", "c", false, "Create an OCI image")
-	rootCmd.Flags().BoolVarP(&extractFlag, "extract", "e", false, "Extract an OCI image")
+	rootCmd.Flags().BoolVarP(&createFlag, "create", "c", false, "Create - TODO")
+	rootCmd.Flags().BoolVarP(&extractFlag, "extract", "e", false, "Extract a Triton cache from an OCI image")
 
 	// Mark the image flag as required
 	rootCmd.MarkFlagRequired("image")
