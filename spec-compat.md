@@ -129,7 +129,7 @@ $ buildah --name quay.io/mtahhan/triton-cache:01-vector-add-latest from scratch
 $ buildah config --annotation "module.triton.image/variant=compat" quay.io/mtahhan/triton-cache:01-vector-add-latest
 ```
 
-**Note this step is optional. See [Annotation](#annotation) section.**
+> Note: This step is optional. See [Annotation](#annotation) section.
 
 
 3. Then copy the files into that base image by `buildah copy` command
@@ -140,7 +140,7 @@ $ buildah copy quay.io/mtahhan/triton-cache:01-vector-add-latest 01-vector-add-c
 612fd1391d341bcb9f738a4d0ed6a15095e68dfc3245d8a899af3ecb4b60b8b1
 ```
 
-> Note: you must execute `buildah copy` exactly once in order to end
+> NOTE: you must execute `buildah copy` exactly once in order to end
 > up having only one layer in produced images**
 
 4. Now, you can build a *compat* image and push it to your registry
@@ -170,7 +170,9 @@ LABEL org.opencontainers.image.title=01-vector-add-latest
 COPY 01-vector-add-cache ./io.triton.cache
 ```
 
-**Note: you must have exactly one `COPY` instruction in the Dockerfile at the end as only the last layer in produced images is going to be taken into account to obtain the files**
+> NOTE: you must have exactly one `COPY` instruction in the Dockerfile
+  at the end as only the last layer in produced images is going to be
+  taken into account to obtain the files.
 
 2. Then, build your image via `docker build` command
 
