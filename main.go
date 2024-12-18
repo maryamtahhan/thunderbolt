@@ -40,7 +40,7 @@ func main() {
 	// Define the CLI command using cobra
 	var rootCmd = &cobra.Command{
 		Use:   "thunderbolt",
-		Short: "A utility to manage GPU Kernel runtime container images",
+		Short: "A GPU Kernel runtime container image management utility",
 		Run: func(cmd *cobra.Command, args []string) {
 			if createFlag {
 				if err := createCacheImage(imageName); err != nil {

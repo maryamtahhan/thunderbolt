@@ -14,8 +14,8 @@ $ go build
 ## Usage
 
 ```bash
-$  ./thunderbolt -h
-A utility to manage GPU Kernel runtime container images
+$ ./thunderbolt -h
+A GPU Kernel runtime container image management utility
 
 Usage:
   thunderbolt [flags]
