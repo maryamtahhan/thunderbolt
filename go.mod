@@ -1,20 +1,18 @@
-module triton-cache-fetcher
+module github.com/gpuman/thunderbolt
 
 go 1.23.4
 
 require (
-	github.com/docker/cli v27.4.0+incompatible
 	github.com/google/go-containerregistry v0.20.2
 	github.com/hashicorp/go-multierror v1.1.1
 	github.com/spf13/cobra v1.7.0
-	k8s.io/klog/v2 v2.130.1
 )
 
 require (
 	github.com/containerd/stargz-snapshotter/estargz v0.14.3 // indirect
+	github.com/docker/cli v27.4.0+incompatible // indirect
 	github.com/docker/distribution v2.8.2+incompatible // indirect
 	github.com/docker/docker-credential-helpers v0.7.0 // indirect
-	github.com/go-logr/logr v1.4.1 // indirect
 	github.com/hashicorp/errwrap v1.0.0 // indirect
 	github.com/inconshreveable/mousetrap v1.1.0 // indirect
 	github.com/klauspost/compress v1.16.5 // indirect

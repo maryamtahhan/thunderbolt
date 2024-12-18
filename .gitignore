@@ -15,7 +15,7 @@ Session.vim
 *.rej
 
 # compiled binary
-triton-cache-fetcher
+thunderbolt
 
 # vscode
 .vscode
