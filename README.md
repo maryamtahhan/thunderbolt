@@ -1,6 +1,6 @@
 # Thunderbolt
 
-![thunderbolt](https://github.com/user-attachments/assets/f382f353-3dd5-4c6e-8bef-afd8e503f80b)
+<img src="logo/thunderbolt.jpeg" alt="thunderbolt" width="20%" height="auto">
 
 A GPU Kernel management utility.
 
