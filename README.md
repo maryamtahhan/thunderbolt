@@ -42,3 +42,19 @@ There are two variants of the specification:
 
 - [spec.md](./spec.md)
 - [spec-compat.md](./spec-compat.md)
+
+## Example
+
+To extract the Triton Cache for the
+[01-vector-add.py](https://github.com/triton-lang/triton/blob/main/python/tutorials/01-vector-add.py)
+tutorial from [Triton](https://github.com/triton-lang/triton), run the following:
+
+```bash
+./thunderbolt -e -i quay.io/mtahhan/triton-cache:01-vector-add-latest
+Img fetched successfully!!!!!!!!
+Img Digest: sha256:b6d7703261642df0bf95175a64a01548eb4baf265c5755c30ede0fea03cd5d97
+Img Size: 525
+bash-4.4#
+```
+This will extract the cache directory from the `quay.io/mtahhan/triton-cache:01-vector-add-latest`
+container image and copy it to  `~/.triton/cache/`.

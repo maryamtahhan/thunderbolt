@@ -15,20 +15,38 @@
 package main
 
 import (
+	"fmt"
 	"log"
+	"os"
 
-	"github.com/gpuman/thunderbolt/imgmgr"
+	"github.com/gpuman/thunderbolt/pkg/fetcher"
+	"github.com/gpuman/thunderbolt/pkg/push"
 	"github.com/spf13/cobra"
 )
 
 func getCacheImage(imageName string) error {
-	mgr := imgmgr.New()
-	return mgr.FetchAndExtractCache(imageName)
+	f := fetcher.New()
+	return f.FetchAndExtractCache(imageName)
 }
 
 func createCacheImage(imageName string) error {
-	// TODO
-	log.Printf("Creating image: %s - Unsupported yet", imageName)
+	// TODO Ensure that the cache directory exists
+	// Make this configuration
+	cacheDir := os.Getenv("HOME") + "/.triton/cache"
+
+	// Create a new Pusher instance
+	pusher, err := push.New(imageName, cacheDir)
+	if err != nil {
+		log.Fatalf("Failed to create Pusher: %v\n", err)
+	}
+
+	// Push the layer and manifest to the registry
+	err = pusher.Push()
+	if err != nil {
+		log.Fatalf("Failed to push layer and manifest: %v\n", err)
+	}
+
+	fmt.Println("OCI image pushed successfully.")
 	return nil
 }
 
