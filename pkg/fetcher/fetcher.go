@@ -1,17 +1,19 @@
-// Copyright Istio Authors
-// Copyright Red Hat Inc.
-//
-// Licensed under the Apache License, Version 2.0 (the "License");
-// you may not use this file except in compliance with the License.
-// You may obtain a copy of the License at
-//
-//     http://www.apache.org/licenses/LICENSE-2.0
-//
-// Unless required by applicable law or agreed to in writing, software
-// distributed under the License is distributed on an "AS IS" BASIS,
-// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-// See the License for the specific language governing permissions and
-// limitations under the License.
+/*
+Copyright Istio Authors
+Copyright Red Hat Inc.
+
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+
+    http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+*/
 
 package fetcher
 
@@ -34,7 +36,7 @@ import (
 )
 
 // A quick list of TODOS:
-// 1. Add image caching to avoid the overhead of pulling the images down everytime.
+// 1. Add image caching to avoid the overhead of pulling the images down everytime
 // 2. Don't create directories/files in $HOME/.triton/cache if they already exist.
 
 type remoteImgFetcher struct{}
@@ -55,7 +57,7 @@ type TritonCacheExtractor interface {
 	ExtractCache(img v1.Image) error
 }
 
-// ImgMgr provides high-level img processing.
+// ImgMgr retrieves cache images.
 type ImgMgr interface {
 	FetchAndExtractCache(imgName string) error
 }
@@ -180,12 +182,12 @@ func (e *tritonCacheExtractor) ExtractCache(img v1.Image) error {
 	)
 }
 
-func (p *imgMgr) FetchAndExtractCache(imgName string) error {
-	img, err := p.fetcher.FetchImg(imgName)
+func (i *imgMgr) FetchAndExtractCache(imgName string) error {
+	img, err := i.fetcher.FetchImg(imgName)
 	if err != nil {
 		return err
 	}
-	return p.extractor.ExtractCache(img)
+	return i.extractor.ExtractCache(img)
 }
 
 // extractOCIArtifactImg extracts the triton cache from the

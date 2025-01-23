@@ -58,3 +58,57 @@ bash-4.4#
 ```
 This will extract the cache directory from the `quay.io/mtahhan/triton-cache:01-vector-add-latest`
 container image and copy it to  `~/.triton/cache/`.
+
+To Create an OCI image for a Triton Cache using docker run the following:
+
+```bash
+./_output/bin/linux_amd64/thunderbolt -c -i quay.io/mtahhan/01-vector-add-cache -d ./example/01-vector-add-cache
+Dockerfile generated successfully at ./Dockerfile
+--> FROM scratchlsxbp72edslewmsk7ad51zrh as 0
+--> LABEL org.opencontainers.image.title=01-vector-add-cache
+--> COPY ./example/01-vector-add-cache ./io.triton.cache
+--> Committing changes to quay.io/mtahhan/01-vector-add-cache ...
+--> Done
+Docker image built successfully
+OCI image pushed successfully.
+```
+
+To see the new image:
+
+```bash
+ docker images
+REPOSITORY                                                                                TAG                   IMAGE ID       CREATED          SIZE
+quay.io/mtahhan/01-vector-add-cache                                                       latest                32572653bbbd   5 minutes ago    0B
+```
+
+To inspect the image with Skopeo
+
+```bash
+skopeo inspect docker-daemon:quay.io/mtahhan/01-vector-add-cache:latest
+{
+    "Name": "quay.io/mtahhan/01-vector-add-cache",
+    "Digest": "sha256:702c8489ea8bf2565f863d5a1bf46b53a55b100d075c9118072ff812a57ff8b2",
+    "RepoTags": [],
+    "Created": "2025-01-24T14:04:22.696839184Z",
+    "DockerVersion": "27.1.1",
+    "Labels": {
+        "org.opencontainers.image.title": "01-vector-add-cache"
+    },
+    "Architecture": "amd64",
+    "Os": "linux",
+    "Layers": [
+        "sha256:5f70bf18a086007016e948b04aed3b82103a36bea41755b6cddfaf10ace3c6ef"
+    ],
+    "LayersData": [
+        {
+            "MIMEType": "application/vnd.docker.image.rootfs.diff.tar.gzip",
+            "Digest": "sha256:5f70bf18a086007016e948b04aed3b82103a36bea41755b6cddfaf10ace3c6ef",
+            "Size": 1024,
+            "Annotations": null
+        }
+    ],
+    "Env": [
+        "PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
+    ]
+}
+```
