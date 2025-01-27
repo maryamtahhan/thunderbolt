@@ -50,7 +50,7 @@ To extract the Triton Cache for the
 tutorial from [Triton](https://github.com/triton-lang/triton), run the following:
 
 ```bash
-./thunderbolt -e -i quay.io/mtahhan/triton-cache:01-vector-add-latest
+./_output/bin/linux_amd64/thunderbolt -e -i quay.io/mtahhan/triton-cache:01-vector-add-latest
 Img fetched successfully!!!!!!!!
 Img Digest: sha256:b6d7703261642df0bf95175a64a01548eb4baf265c5755c30ede0fea03cd5d97
 Img Size: 525

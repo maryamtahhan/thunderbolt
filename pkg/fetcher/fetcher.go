@@ -20,6 +20,7 @@ package fetcher
 import (
 	"archive/tar"
 	"compress/gzip"
+	"context"
 	"errors"
 	"fmt"
 	"io"
@@ -27,10 +28,13 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/docker/docker/api/types/image"
+	"github.com/docker/docker/client"
 	"github.com/google/go-containerregistry/pkg/authn"
 	"github.com/google/go-containerregistry/pkg/name"
 	v1 "github.com/google/go-containerregistry/pkg/v1"
 	"github.com/google/go-containerregistry/pkg/v1/remote"
+	"github.com/google/go-containerregistry/pkg/v1/tarball"
 	"github.com/google/go-containerregistry/pkg/v1/types"
 	"github.com/hashicorp/go-multierror"
 )
@@ -70,7 +74,7 @@ func New() ImgMgr {
 	}
 }
 
-// func saveImageToCache(path string, img v1.Image, ref name.Reference) error {
+// func saveImageLocally(path string, img v1.Image, ref name.Reference) error {
 // 	out, err := os.Create(path)
 // 	if err != nil {
 // 		return fmt.Errorf("failed to create cache file: %w", err)
@@ -84,40 +88,88 @@ func New() ImgMgr {
 // 	return nil
 // }
 
-// func loadImageFromCache(path string) (v1.Image, error) {
-// 	img, err := tarball.ImageFromPath(path, nil)
-// 	if err != nil {
-// 		return nil, fmt.Errorf("failed to load image from cache: %w", err)
-// 	}
-// 	return img, nil
-// }
+func loadImageFromTarball(path string) (v1.Image, error) {
+	img, err := tarball.ImageFromPath(path, nil)
+	if err != nil {
+		return nil, fmt.Errorf("failed to load image from cache: %w", err)
+	}
+	return img, nil
+}
+
+func checkLocalImages(imgName string) error {
+	// Initialize Docker client
+	apiClient, err := client.NewClientWithOpts(client.FromEnv, client.WithAPIVersionNegotiation())
+	if err != nil {
+		return fmt.Errorf("failed to create Docker client: %w", err)
+	}
+	defer apiClient.Close()
+
+	images, err := apiClient.ImageList(context.Background(), image.ListOptions{})
+	if err != nil {
+		return fmt.Errorf("failed to retrieve Docker images: %w", err)
+	}
+
+	// Iterate through images and check for matching name
+	for _, img := range images {
+		for _, tag := range img.RepoTags {
+			if tag == imgName {
+				fmt.Printf("Found local image: %s\n", tag)
+				//return &img, nil // Return the image if found
+				// Use the Docker client to save the image to a tarball
+				reader, err := apiClient.ImageSave(context.Background(), []string{imgName})
+				if err != nil {
+					return fmt.Errorf("failed to save image: %v", err)
+				}
+				defer reader.Close()
+
+				// Create a tarball file where the image will be saved
+				tarballFile, err := os.Create("test.tar")
+				if err != nil {
+					return fmt.Errorf("failed to create tarball file: %v", err)
+				}
+				defer tarballFile.Close()
+
+				// Copy the content from the reader to the tarball file
+				_, err = io.Copy(tarballFile, reader)
+				if err != nil {
+					return fmt.Errorf("failed to copy data to tarball file: %v", err)
+				}
+
+				fmt.Printf("Saved image: %s\n", tarballFile.Name())
+				return nil
+			}
+		}
+	}
+
+	return fmt.Errorf("failed to create Docker client: %w", err)
+}
 
 // FetchImg pulls the image from the registry and extracts the TritonCache
 func (f *remoteImgFetcher) FetchImg(imgName string) (v1.Image, error) {
+	var img v1.Image
 	// Parse the image name into a reference (e.g., quay.io/mtahhan/triton-cache)
 	ref, err := name.ParseReference(imgName)
 	if err != nil {
 		return nil, fmt.Errorf("failed to parse image name: %w", err)
 	}
 
-	// Check if the image is cached locally
-	// cachedImagePath := filepath.Join(os.TempDir(), "cached_images", ref.Identifier())
-	// if _, err := os.Stat(cachedImagePath); err == nil {
-	// 	fmt.Printf("Image %s is already cached locally.", imgName)
-	// 	img, err := loadImageFromCache(cachedImagePath)
-	// 	if err == nil {
-	// 		return img, nil
-	// 	}
-	// 	fmt.Printf("Failed to load cached image, fetching from registry: %v", err)
-	// }
-	// Fetch the image descriptor (including the manifest)
-	img, err := remote.Image(ref, remote.WithAuthFromKeychain(authn.DefaultKeychain))
+	// Check if the image is available locally
+	err = checkLocalImages(imgName)
 	if err != nil {
-		return nil, fmt.Errorf("failed to fetch image: %w", err)
+		fmt.Printf("Retrieve remote Img %v!!!!!!!!", err)
+		img, err = remote.Image(ref, remote.WithAuthFromKeychain(authn.DefaultKeychain))
+		if err != nil {
+			return nil, fmt.Errorf("failed to fetch image: %w", err)
+		}
+		// Print the image details
+		fmt.Println("Img fetched successfully!!!!!!!!")
+	} else {
+		img, err = loadImageFromTarball("test.tar")
+		if err != nil {
+			return nil, fmt.Errorf("failed to fetch image: %w", err)
+		}
+		fmt.Println("Img loaded successfully!!!!!!!!")
 	}
-
-	// Print the image details
-	fmt.Println("Img fetched successfully!!!!!!!!")
 
 	// Get the image digest and handle the error
 	digest, err := img.Digest()
@@ -135,11 +187,10 @@ func (f *remoteImgFetcher) FetchImg(imgName string) (v1.Image, error) {
 	fmt.Printf("Img Size: %v\n", size)
 
 	// Save the image to the cache
-	// err = saveImageToCache(cachedImagePath, img, ref)
+	// err = saveImageLocally(cachedImagePath, img, ref)
 	// if err != nil {
 	// 	fmt.Printf("Failed to cache image: %v", err)
 	// }
-
 	return img, nil
 }
 
@@ -158,20 +209,24 @@ func (e *tritonCacheExtractor) ExtractCache(img v1.Image) error {
 		if err != nil {
 			return fmt.Errorf("could not extract the Triton Cache from the container image %v", err)
 		}
+		os.Remove("test.tar") //TODO better cleanup
 		return nil
 	}
 
 	// We try to parse it as the "compat" variant image with a single "application/vnd.oci.image.layer.v1.tar+gzip" layer.
 	_, errCompat := extractOCIStandardImg(img)
 	if errCompat == nil {
+		os.Remove("test.tar") //TODO better cleanup
 		return nil
 	}
 
 	// Otherwise, we try to parse it as the *oci* variant image with custom artifact media types.
 	_, errOCI := extractOCIArtifactImg(img)
 	if errOCI == nil {
+		os.Remove("test.tar") //TODO better cleanup
 		return nil
 	}
+	os.Remove("test.tar") //TODO better cleanup
 
 	// We failed to parse the image in any format, so wrap the errors and return.
 	return fmt.Errorf("the given image is in invalid format as an OCI image: %v",
