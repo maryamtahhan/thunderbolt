@@ -84,6 +84,7 @@ func generateDockerfile(imageTitle, CacheDir, outputPath string) error {
 func (w *tritonCacheWrapper) CreateImage(imageName, cacheDir string) error {
 	// Generate the Dockerfile
 	dockerfilePath := "./Dockerfile"
+
 	options := dockerclient.NewClientExecutor(nil)
 
 	// Extract the last part after the last '/' (the full image name with optional tag)
@@ -100,7 +101,7 @@ func (w *tritonCacheWrapper) CreateImage(imageName, cacheDir string) error {
 	defer os.Remove(dockerfilePath) // Cleanup Dockerfile after build
 
 	options.Out, options.ErrOut = os.Stdout, os.Stderr
-	authConfigurations, err := docker.NewAuthConfigurationsFromDockerCfg()
+	authConfigurations, _ := docker.NewAuthConfigurationsFromDockerCfg()
 	options.AuthFn = func(name string) ([]dockerregistrytypes.AuthConfig, bool) {
 		if authConfigurations != nil {
 			if authConfig, ok := authConfigurations.Configs[name]; ok {
@@ -171,7 +172,7 @@ func (w *tritonCacheWrapper) CreateImage(imageName, cacheDir string) error {
 		dockerfiles = []string{filepath.Join(options.Directory, "Dockerfile")}
 	}
 	options.Directory = filepath.Dir(dockerfilePath)
-
+	//imageFrom = "scratch"
 	if err := build(dockerfiles[0], dockerfiles[1:], arguments, imageFrom, target, options); err != nil {
 		log.Fatal(err.Error())
 		return err
@@ -204,6 +205,7 @@ func build(dockerfile string, additionalDockerfiles []string, arguments map[stri
 	if err != nil {
 		return err
 	}
+
 	for _, s := range additionalDockerfiles {
 		additionalNode, err := imagebuilder.ParseFile(s)
 		if err != nil {
@@ -212,7 +214,9 @@ func build(dockerfile string, additionalDockerfiles []string, arguments map[stri
 		node.Children = append(node.Children, additionalNode.Children...)
 	}
 
+	arguments = map[string]string{"squash": "true"}
 	b := imagebuilder.NewBuilder(arguments)
+	//	b.Args = map[string]string{"squash": "true"}
 	stages, err := imagebuilder.NewStages(node, b)
 	if err != nil {
 		return err

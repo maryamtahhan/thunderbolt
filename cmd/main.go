@@ -21,7 +21,8 @@ import (
 	"log"
 
 	"github.com/gpuman/thunderbolt/pkg/fetcher"
-	"github.com/gpuman/thunderbolt/pkg/wrap"
+	//"github.com/gpuman/thunderbolt/pkg/wrap"
+	"github.com/gpuman/thunderbolt/pkg/dockerbuild"
 	"github.com/spf13/cobra"
 )
 
@@ -36,7 +37,7 @@ func createCacheImage(imageName, cacheDir string) error {
 	// cacheDir := os.Getenv("HOME") + "/.triton/cache"
 
 	// Create a new wrapper instance
-	wrapper := wrap.New()
+	wrapper := dockerbuild.New()
 	if wrapper == nil {
 		log.Fatal("Failed to create wrapper\n")
 	}
