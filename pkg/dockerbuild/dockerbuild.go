@@ -25,12 +25,12 @@ type imgBuilder struct {
 	wrapper TritonCacheWrapper
 }
 
-// TritonCacheExtractor extracts the Triton cache from an image.
+// TritonCacheWrapper wraps the Triton cache in a single layer OCI image.
 type TritonCacheWrapper interface {
 	CreateImage(imgName string, cacheDir string) error
 }
 
-// ImgBuilder wraps cache directories in an OCI image
+// ImgBuilder wraps triton cache directories in an OCI image
 type ImgBuilder interface {
 	CreateCacheImage(imgName string, cacheDir string) error
 }
@@ -46,13 +46,11 @@ func (i *imgBuilder) CreateCacheImage(imgName, cacheDir string) error {
 	return i.wrapper.CreateImage(imgName, cacheDir)
 }
 
-// DockerfileData holds the dynamic values for the Dockerfile.
 type DockerfileData struct {
 	ImageTitle string
 	CacheDir   string
 }
 
-// generateDockerfile generates a Dockerfile with the given parameters.
 func generateDockerfile(imageTitle, CacheDir, outputPath string) error {
 	data := DockerfileData{
 		ImageTitle: imageTitle,
