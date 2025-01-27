@@ -62,13 +62,22 @@ container image and copy it to  `~/.triton/cache/`.
 To Create an OCI image for a Triton Cache using docker run the following:
 
 ```bash
-./_output/bin/linux_amd64/thunderbolt -c -i quay.io/mtahhan/01-vector-add-cache -d ./example/01-vector-add-cache
-Dockerfile generated successfully at ./Dockerfile
---> FROM scratchlsxbp72edslewmsk7ad51zrh as 0
---> LABEL org.opencontainers.image.title=01-vector-add-cache
---> COPY ./example/01-vector-add-cache ./io.triton.cache
---> Committing changes to quay.io/mtahhan/01-vector-add-cache ...
---> Done
+./_output/bin/linux_amd64/thunderbolt -c -i quay.io/mtahhan/01-vector-add-cache -d example/01-vector-add-cache
+Current working directory: /home/mtahhan/thunderbolt
+Dockerfile generated successfully at /home/mtahhan/thunderbolt/Dockerfile
+{"stream":"Step 1/3 : FROM scratch"}
+{"stream":"\n"}
+{"stream":" ---\u003e \n"}
+{"stream":"Step 2/3 : LABEL org.opencontainers.image.title=01-vector-add-cache"}
+{"stream":"\n"}
+{"stream":" ---\u003e Running in e984b66d8ba8\n"}
+{"stream":" ---\u003e 252e1fe2dccf\n"}
+{"stream":"Step 3/3 : COPY \"example/01-vector-add-cache/\" ./io.triton.cache/"}
+{"stream":"\n"}
+{"stream":" ---\u003e f14fef40f4cf\n"}
+{"aux":{"ID":"sha256:f14fef40f4cf859010039b06cfcb4bfa3eedb3a259336679026f3784fd751ec2"}}
+{"stream":"Successfully built f14fef40f4cf\n"}
+{"stream":"Successfully tagged quay.io/mtahhan/01-vector-add-cache:latest\n"}
 Docker image built successfully
 OCI image pushed successfully.
 ```
@@ -85,11 +94,12 @@ To inspect the image with Skopeo
 
 ```bash
 skopeo inspect docker-daemon:quay.io/mtahhan/01-vector-add-cache:latest
+
 {
     "Name": "quay.io/mtahhan/01-vector-add-cache",
-    "Digest": "sha256:702c8489ea8bf2565f863d5a1bf46b53a55b100d075c9118072ff812a57ff8b2",
+    "Digest": "sha256:3a6338dde949fd7158c2a7c54b17f866c3587e7c022b84ce443924f861335f2f",
     "RepoTags": [],
-    "Created": "2025-01-24T14:04:22.696839184Z",
+    "Created": "2025-01-27T10:45:28.225035278Z",
     "DockerVersion": "27.1.1",
     "Labels": {
         "org.opencontainers.image.title": "01-vector-add-cache"
@@ -97,13 +107,13 @@ skopeo inspect docker-daemon:quay.io/mtahhan/01-vector-add-cache:latest
     "Architecture": "amd64",
     "Os": "linux",
     "Layers": [
-        "sha256:5f70bf18a086007016e948b04aed3b82103a36bea41755b6cddfaf10ace3c6ef"
+        "sha256:6e28c76bcba8c174724befa53cbf7f36e7684609c7fefa13004bac257324f594"
     ],
     "LayersData": [
         {
             "MIMEType": "application/vnd.docker.image.rootfs.diff.tar.gzip",
-            "Digest": "sha256:5f70bf18a086007016e948b04aed3b82103a36bea41755b6cddfaf10ace3c6ef",
-            "Size": 1024,
+            "Digest": "sha256:6e28c76bcba8c174724befa53cbf7f36e7684609c7fefa13004bac257324f594",
+            "Size": 82432,
             "Annotations": null
         }
     ],
