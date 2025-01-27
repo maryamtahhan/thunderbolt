@@ -28,7 +28,10 @@ import (
 	"github.com/docker/docker/pkg/archive"
 )
 
-// DockerfileTemplate defines the structure of the Dockerfile.
+// A quick list of TODOS:
+// 1. make the interface generic
+// 2. add buildah support
+
 const DockerfileTemplate = `FROM scratch
 LABEL org.opencontainers.image.title={{ .ImageTitle }}
 COPY "{{ .CacheDir }}/" ./io.triton.cache/

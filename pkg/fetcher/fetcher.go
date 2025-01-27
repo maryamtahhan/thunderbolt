@@ -42,6 +42,8 @@ import (
 // A quick list of TODOS:
 // 1. Add image caching to avoid the overhead of pulling the images down everytime
 // 2. Don't create directories/files in $HOME/.triton/cache if they already exist.
+// 3. Store tmp files in a specifc location and clean then up better.
+// 4. Support podman
 
 type remoteImgFetcher struct{}
 type tritonCacheExtractor struct{}
