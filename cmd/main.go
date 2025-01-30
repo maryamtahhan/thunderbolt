@@ -37,6 +37,11 @@ const (
 	exitCreateError  = 2
 )
 
+func init() {
+	// Bind klog flags to Cobra
+	pflag.CommandLine.AddGoFlagSet(flag.CommandLine)
+}
+
 func getCacheImage(imageName string) error {
 	f := fetcher.New()
 	return f.FetchAndExtractCache(imageName)
@@ -64,10 +69,7 @@ func createCacheImage(imageName, cacheDir string) error {
 	klog.Info("OCI image created successfully.")
 	return nil
 }
-func init() {
-	// Bind klog flags to Cobra
-	pflag.CommandLine.AddGoFlagSet(flag.CommandLine)
-}
+
 func main() {
 	var imageName string
 	var cacheDirName string
