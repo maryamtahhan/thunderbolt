@@ -55,7 +55,7 @@ func createCacheImage(imageName, cacheDir string) error {
 		return fmt.Errorf("failed to create builder")
 	}
 
-	// Push the layer and manifest to the registry
+	// Create the OCI Image
 	err = builder.CreateImage(imageName, cacheDir)
 	if err != nil {
 		return fmt.Errorf("failed to create the OCI image: %v", err)
