@@ -32,6 +32,10 @@ to create an OCI image containing a Triton cache directory
 please follow the instructions in
 [spec-compat.md](./spec-compat.md).
 
+## Dependencies
+
+- [buildah dependencies](https://github.com/containers/buildah/blob/main/install.md#building-from-scratch)
+
 ## Triton Cache Image Container Specification
 
 The Triton Cache Image specification defines how to bundle Triton Caches
@@ -90,7 +94,7 @@ REPOSITORY                                                                      
 quay.io/mtahhan/01-vector-add-cache                                                       latest                32572653bbbd   5 minutes ago    0B
 ```
 
-To inspect the image with Skopeo
+To inspect the docker image with Skopeo
 
 ```bash
 skopeo inspect docker-daemon:quay.io/mtahhan/01-vector-add-cache:latest
@@ -120,5 +124,43 @@ skopeo inspect docker-daemon:quay.io/mtahhan/01-vector-add-cache:latest
     "Env": [
         "PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
     ]
+}
+```
+
+> **Note**: If `buildah` is installed it will be favoured to build the image.
+The build output is shown below.
+
+```bash
+./_output/bin/linux_amd64/thunderbolt -c -i quay.io/mtahhan/01-vector-add-cache -d example/01-vector-add-cache
+I0130 08:03:16.000139 1428288 buildahbuild.go:29] /tmp/buildah-cache-dir-998428527
+I0130 08:03:16.198810 1428288 buildahbuild.go:84] Image built! 28bd917fc7ae901e6bb52a9b8b7937373ce894e49c9d3881a12e8986441ed99c
+I0130 08:03:16.201785 1428288 main.go:62] OCI image created successfully.
+```
+
+To inspect the buildah image with Skopeo
+
+```bash
+skopeo inspect containers-storage:quay.io/mtahhan/01-vector-add-cache:latest
+{
+    "Name": "quay.io/mtahhan/01-vector-add-cache",
+    "Digest": "sha256:33c3111fc6413a183ce4219fa0ba3dd504b9687310f97036bb2ad073411bbc72",
+    "RepoTags": [],
+    "Created": "2025-01-30T12:55:07.919709618Z",
+    "DockerVersion": "",
+    "Labels": null,
+    "Architecture": "amd64",
+    "Os": "linux",
+    "Layers": [
+        "sha256:69997c0f1470846d1b91d703f7749293ccec272b7e8a84b42074027ace03b836"
+    ],
+    "LayersData": [
+        {
+            "MIMEType": "application/vnd.oci.image.layer.v1.tar",
+            "Digest": "sha256:69997c0f1470846d1b91d703f7749293ccec272b7e8a84b42074027ace03b836",
+            "Size": 82432,
+            "Annotations": null
+        }
+    ],
+    "Env": null
 }
 ```

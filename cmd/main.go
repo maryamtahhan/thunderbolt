@@ -17,13 +17,24 @@ limitations under the License.
 package main
 
 import (
+	"flag"
 	"fmt"
-	"log"
+	"os"
 
+	"github.com/containers/buildah"
+	"github.com/containers/storage/pkg/unshare"
 	"github.com/gpuman/thunderbolt/pkg/fetcher"
-	//"github.com/gpuman/thunderbolt/pkg/wrap"
-	"github.com/gpuman/thunderbolt/pkg/dockerbuild"
+	"github.com/gpuman/thunderbolt/pkg/imgbuild"
+	"github.com/gpuman/thunderbolt/pkg/utils"
 	"github.com/spf13/cobra"
+	"github.com/spf13/pflag"
+	"k8s.io/klog/v2"
+)
+
+const (
+	exitNormal       = 0
+	exitExtractError = 1
+	exitCreateError  = 2
 )
 
 func getCacheImage(imageName string) error {
@@ -32,66 +43,91 @@ func getCacheImage(imageName string) error {
 }
 
 func createCacheImage(imageName, cacheDir string) error {
-	// TODO Ensure that the cache directory exists
-	// Make this configuration
-	// cacheDir := os.Getenv("HOME") + "/.triton/cache"
 
-	// Create a new wrapper instance
-	wrapper := dockerbuild.New()
-	if wrapper == nil {
-		log.Fatal("Failed to create wrapper\n")
+	_, err := utils.FilePathExists(cacheDir)
+	if err != nil {
+		return fmt.Errorf("error checking cache file path: %v", err)
+	}
+
+	// Create a new builder instance
+	builder, _ := imgbuild.New()
+	if builder == nil {
+		return fmt.Errorf("failed to create builder")
 	}
 
 	// Push the layer and manifest to the registry
-	err := wrapper.CreateCacheImage(imageName, cacheDir)
+	err = builder.CreateImage(imageName, cacheDir)
 	if err != nil {
-		log.Fatalf("Failed to create the OCI image: %v\n", err)
+		return fmt.Errorf("failed to create the OCI image: %v", err)
 	}
 
-	fmt.Println("OCI image pushed successfully.")
+	klog.Info("OCI image created successfully.")
 	return nil
 }
-
+func init() {
+	// Bind klog flags to Cobra
+	pflag.CommandLine.AddGoFlagSet(flag.CommandLine)
+}
 func main() {
 	var imageName string
 	var cacheDirName string
 	var createFlag bool
 	var extractFlag bool
+	var logLevel int
+
+	klog.InitFlags(nil)
+	defer klog.Flush()
 
 	// Define the CLI command using cobra
 	var rootCmd = &cobra.Command{
 		Use:   "thunderbolt",
 		Short: "A GPU Kernel runtime container image management utility",
+		PersistentPreRun: func(cmd *cobra.Command, args []string) {
+			// Set klog verbosity level from `--log-level` flag
+			_ = flag.Set("v", fmt.Sprintf("%d", logLevel))
+		},
 		Run: func(cmd *cobra.Command, args []string) {
 			if createFlag {
 				if err := createCacheImage(imageName, cacheDirName); err != nil {
-					log.Fatalf("Error creating image: %v\n", err)
+					klog.Fatalf("Error creating image: %v\n", err)
+					os.Exit(exitCreateError)
 				}
 			}
 
 			if extractFlag {
 				if err := getCacheImage(imageName); err != nil {
-					log.Fatalf("Error extracting image: %v\n", err)
+					klog.Fatalf("Error extracting image: %v\n", err)
+					os.Exit(exitExtractError)
 				}
 			}
 
 			if !createFlag && !extractFlag {
-				log.Println("No action specified. Use --create or --extract flag.")
+				klog.Error("No action specified. Use --create or --extract flag.")
+				os.Exit(exitNormal)
 			}
 		},
 	}
+	// Bind klog flags to Cobra's flag set
+	pflag.CommandLine.AddGoFlagSet(flag.CommandLine)
 
 	// Define the flags for the command-line arguments
 	rootCmd.Flags().StringVarP(&imageName, "image", "i", "", "OCI image name")
 	rootCmd.Flags().StringVarP(&cacheDirName, "dir", "d", "", "Triton Cache Directory")
 	rootCmd.Flags().BoolVarP(&createFlag, "create", "c", false, "Create OCI image")
 	rootCmd.Flags().BoolVarP(&extractFlag, "extract", "e", false, "Extract a Triton cache from an OCI image")
+	rootCmd.PersistentFlags().IntVarP(&logLevel, "log-level", "l", 0, "Set the logging verbosity level (0 = minimal, higher is more verbose)")
 
 	// Mark the image flag as required
 	rootCmd.MarkFlagRequired("image")
 
+	// Important to call from main()
+	if buildah.InitReexec() {
+		return
+	}
+	unshare.MaybeReexecUsingUserNamespace(false)
+
 	// Execute the root command
 	if err := rootCmd.Execute(); err != nil {
-		log.Fatalf("Error: %v\n", err)
+		klog.Fatalf("Error: %v\n", err)
 	}
 }

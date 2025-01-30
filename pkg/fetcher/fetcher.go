@@ -37,6 +37,7 @@ import (
 	"github.com/google/go-containerregistry/pkg/v1/tarball"
 	"github.com/google/go-containerregistry/pkg/v1/types"
 	"github.com/hashicorp/go-multierror"
+	"k8s.io/klog/v2"
 )
 
 // A quick list of TODOS:
@@ -158,19 +159,19 @@ func (f *remoteImgFetcher) FetchImg(imgName string) (v1.Image, error) {
 	// Check if the image is available locally
 	err = checkLocalImages(imgName)
 	if err != nil {
-		fmt.Printf("Retrieve remote Img %v!!!!!!!!", err)
+		klog.Infof("Retrieve remote Img %v!!!!!!!!", err)
 		img, err = remote.Image(ref, remote.WithAuthFromKeychain(authn.DefaultKeychain))
 		if err != nil {
 			return nil, fmt.Errorf("failed to fetch image: %w", err)
 		}
 		// Print the image details
-		fmt.Println("Img fetched successfully!!!!!!!!")
+		klog.Info("Img fetched successfully!!!!!!!!")
 	} else {
 		img, err = loadImageFromTarball("test.tar")
 		if err != nil {
 			return nil, fmt.Errorf("failed to fetch image: %w", err)
 		}
-		fmt.Println("Img loaded successfully!!!!!!!!")
+		klog.Info("Img loaded successfully!!!!!!!!")
 	}
 
 	// Get the image digest and handle the error
@@ -179,14 +180,14 @@ func (f *remoteImgFetcher) FetchImg(imgName string) (v1.Image, error) {
 		return nil, fmt.Errorf("failed to get image digest: %w", err)
 	}
 	// Print the image digest
-	fmt.Println("Img Digest:", digest)
+	klog.Info("Img Digest:", digest)
 
 	size, err := img.Size()
 	if err != nil {
 		return nil, fmt.Errorf("failed to get image digest: %w", err)
 	}
 	// Print the image size
-	fmt.Printf("Img Size: %v\n", size)
+	klog.Info("Img Size: %v\n", size)
 
 	// Save the image to the cache
 	// err = saveImageLocally(cachedImagePath, img, ref)
