@@ -1,10 +1,8 @@
 package imgbuild
 
 import (
-	"errors"
 	"fmt"
 	"os"
-	"os/exec"
 	"strings"
 	"text/template"
 
@@ -49,25 +47,4 @@ func generateDockerfile(imageName, CacheDir, outputPath string) error {
 
 	klog.Infof("Dockerfile generated successfully at %s", outputPath)
 	return nil
-}
-
-/*
-hasApp checks if the host has a particular app installed and returns a boolean.
-It also executes the command: {app} --version and returns the version as
-a string.
-*/
-func hasApp(app string) bool {
-
-	path, err := exec.LookPath(app)
-	if err != nil {
-		if errors.Is(err, exec.ErrNotFound) {
-			return false
-		}
-		return false
-	}
-	if path == "" {
-		return false
-	}
-
-	return true
 }

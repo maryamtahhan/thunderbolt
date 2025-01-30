@@ -1,6 +1,10 @@
 package imgbuild
 
-import "fmt"
+import (
+	"fmt"
+
+	"github.com/gpuman/thunderbolt/pkg/utils"
+)
 
 type ImageBuilder interface {
 	CreateImage(imgName string, cacheDir string) error
@@ -15,9 +19,9 @@ func New() (ImageBuilder, error) {
 	var builder ImageBuilder
 	var builderType string
 
-	if hasApp("buildah") {
+	if utils.HasApp("buildah") {
 		builderType = "buildah"
-	} else if hasApp("docker") {
+	} else if utils.HasApp("docker") {
 		builderType = "docker"
 	}
 
