@@ -28,10 +28,6 @@ import (
 	"k8s.io/klog/v2"
 )
 
-// A quick list of TODOS:
-// 1. make the interface generic
-// 2. add buildah support
-
 type dockerBuilder struct{}
 
 // Docker implementation of the ImageBuilder interface.

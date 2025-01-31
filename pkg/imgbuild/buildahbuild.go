@@ -52,7 +52,6 @@ func (b *buildahBuilder) CreateImage(imageName, cacheDir string) error {
 		return fmt.Errorf("error creating the image reference: %v", err)
 	}
 
-	// Define Buildah build options
 	builderOpts := buildah.BuilderOptions{
 		Capabilities: capabilitiesForRoot,
 		FromImage:    "scratch",
@@ -92,7 +91,6 @@ func copyDir(srcDir, dstDir string) error {
 
 	cmd := exec.Command("cp", "-r", srcDir, dstDir)
 
-	// Run the command
 	err := cmd.Run()
 	if err != nil {
 		return fmt.Errorf("error executing cp command: %v", err)

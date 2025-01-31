@@ -30,6 +30,7 @@ import (
 	v1 "github.com/google/go-containerregistry/pkg/v1"
 	"github.com/google/go-containerregistry/pkg/v1/tarball"
 	"github.com/google/go-containerregistry/pkg/v1/types"
+	"github.com/gpuman/thunderbolt/pkg/constants"
 	"github.com/gpuman/thunderbolt/pkg/utils"
 	"github.com/hashicorp/go-multierror"
 	"k8s.io/klog/v2"
@@ -112,22 +113,18 @@ func (i *imgFetcher) FetchImg(imgName string) (v1.Image, error) {
 	}
 	klog.V(4).Info("Img retrieved successfully!!!!!!!!")
 
-	// Get the image digest and handle the error
 	digest, err := img.Digest()
 	if err != nil {
 		return nil, fmt.Errorf("failed to get image digest: %w", err)
 	}
-	// Print the image digest
 	klog.V(4).Info("Img Digest:", digest)
 
 	size, err := img.Size()
 	if err != nil {
 		return nil, fmt.Errorf("failed to get image digest: %w", err)
 	}
-	// Print the image size
 	klog.V(4).Infof("Img Size: %v\n", size)
 
-	// Save the image to the cache
 	// err = saveImageLocally(cachedImagePath, img, ref)
 	// if err != nil {
 	// 	fmt.Printf("Failed to cache image: %v", err)
@@ -322,14 +319,10 @@ func extractOCIStandardImg(img v1.Image) ([]byte, error) {
 // Extracts the triton named "io.triton.cache" in a given reader for tar.gz.
 // This is only used for *compat* variant.
 func extractTritonCacheDirectory(r io.Reader) ([]byte, error) {
-	targetDir := os.Getenv("HOME") + "/.triton/cache"
 	gr, err := gzip.NewReader(r)
 	if err != nil {
 		return nil, fmt.Errorf("failed to parse layer as tar.gz: %v", err)
 	}
-
-	// The target directory name to skip (but process its contents)
-	const TritonCacheDirName = "io.triton.cache/"
 
 	// Tar reader to iterate through the archive
 	tr := tar.NewReader(gr)
@@ -343,18 +336,18 @@ func extractTritonCacheDirectory(r io.Reader) ([]byte, error) {
 		}
 
 		// Skip directories and files that are not part of io.triton.cache
-		if !strings.HasPrefix(h.Name, TritonCacheDirName) {
+		if !strings.HasPrefix(h.Name, constants.TritonCacheDirName) {
 			continue
 		}
 
 		// Strip the prefix "io.triton.cache/" from the file path
-		relativePath := strings.TrimPrefix(h.Name, TritonCacheDirName)
+		relativePath := strings.TrimPrefix(h.Name, constants.TritonCacheDirName)
 		if relativePath == "" {
 			continue // Skip the directory itself
 		}
 
 		// Resolve the new file path under the target directory
-		filePath := filepath.Join(targetDir, relativePath)
+		filePath := filepath.Join(constants.TritonCacheDir, relativePath)
 
 		switch h.Typeflag {
 		case tar.TypeDir:
@@ -386,19 +379,16 @@ func writeFile(filePath string, tarReader io.Reader, mode os.FileMode) error {
 		return fmt.Errorf("failed to create parent directories for %s: %w", filePath, err)
 	}
 
-	// Create the file
 	outFile, err := os.Create(filePath)
 	if err != nil {
 		return fmt.Errorf("failed to create file %s: %w", filePath, err)
 	}
 	defer outFile.Close()
 
-	// Copy the file content
 	if _, err := io.Copy(outFile, tarReader); err != nil {
 		return fmt.Errorf("failed to copy content to file %s: %w", filePath, err)
 	}
 
-	// Set file permissions
 	if err := os.Chmod(filePath, mode); err != nil {
 		return fmt.Errorf("failed to set file permissions for %s: %w", filePath, err)
 	}

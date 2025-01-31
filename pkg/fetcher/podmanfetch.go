@@ -22,7 +22,6 @@ func (p *podmanFetcher) FetchImg(imgName string) (v1.Image, error) {
 	}
 
 	options := images.ExistsOptions{}
-	// Retrieve the list of images
 	exists, err := images.Exists(ctx, imgName, &options)
 	if err != nil {
 		return nil, fmt.Errorf("failed to retrieve Podman images: %w", err)
