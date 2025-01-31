@@ -2,8 +2,12 @@ package utils
 
 import (
 	"errors"
+	"fmt"
 	"os"
 	"os/exec"
+
+	"github.com/gpuman/thunderbolt/pkg/constants"
+	"k8s.io/klog/v2"
 )
 
 func FilePathExists(path string) (bool, error) {
@@ -32,4 +36,23 @@ func HasApp(app string) bool {
 	}
 
 	return true
+}
+
+func CleanupTmpDirs() error {
+	tmpDirPrefixes := []string{
+		constants.BuildahCacheDirPrefix,
+		constants.DockerCacheDirPrefix,
+		constants.PodmanCacheDirPrefix,
+	}
+
+	for _, prefix := range tmpDirPrefixes {
+		cmd := exec.Command("rm", "-rf", "/tmp/"+prefix)
+
+		if err := cmd.Run(); err != nil {
+			return fmt.Errorf("failed to delete /tmp/%s: %w", prefix, err)
+		}
+	}
+
+	klog.V(4).Info("Temporary directories successfully deleted.")
+	return nil
 }

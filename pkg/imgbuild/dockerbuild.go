@@ -24,6 +24,7 @@ import (
 	"github.com/docker/docker/api/types"
 	"github.com/docker/docker/client"
 	"github.com/docker/docker/pkg/archive"
+	"github.com/gpuman/thunderbolt/pkg/utils"
 	"k8s.io/klog/v2"
 )
 
@@ -81,6 +82,7 @@ func (d *dockerBuilder) CreateImage(imageName, cacheDir string) error {
 		return fmt.Errorf("error tagging image: %w", err)
 	}
 
+	utils.CleanupTmpDirs()
 	klog.Info("Docker image built successfully")
 	return nil
 }

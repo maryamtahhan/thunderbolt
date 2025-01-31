@@ -9,6 +9,7 @@ import (
 	"github.com/containers/podman/v5/pkg/bindings"
 	"github.com/containers/podman/v5/pkg/bindings/images"
 	v1 "github.com/google/go-containerregistry/pkg/v1"
+	"github.com/gpuman/thunderbolt/pkg/constants"
 )
 
 type podmanFetcher struct{}
@@ -19,7 +20,6 @@ func (p *podmanFetcher) FetchImg(imgName string) (v1.Image, error) {
 	if err != nil {
 		return nil, fmt.Errorf("failed to create Podman client: %w", err)
 	}
-	//defer conn.Close()
 
 	options := images.ExistsOptions{}
 	// Retrieve the list of images
@@ -29,11 +29,10 @@ func (p *podmanFetcher) FetchImg(imgName string) (v1.Image, error) {
 	}
 
 	if exists {
-		tmpDir, err := os.MkdirTemp("", "buildah-cache-dir-")
+		tmpDir, err := os.MkdirTemp("", constants.PodmanCacheDirPrefix)
 		if err != nil {
 			return nil, err
 		}
-		//defer os.RemoveAll(tmpDir) TODO
 
 		// Create the tarball file
 		tarballFilePath := path.Join(tmpDir, "tmp.tar")

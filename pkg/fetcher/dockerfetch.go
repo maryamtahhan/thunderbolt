@@ -10,6 +10,7 @@ import (
 	"github.com/docker/docker/api/types/image"
 	"github.com/docker/docker/client"
 	v1 "github.com/google/go-containerregistry/pkg/v1"
+	"github.com/gpuman/thunderbolt/pkg/constants"
 )
 
 type dockerFetcher struct{}
@@ -40,7 +41,7 @@ func (d *dockerFetcher) FetchImg(imgName string) (v1.Image, error) {
 				}
 				defer reader.Close()
 
-				tmpDir, err := os.MkdirTemp("", "docker-cache-dir-")
+				tmpDir, err := os.MkdirTemp("", constants.DockerCacheDirPrefix)
 				if err != nil {
 					return nil, err
 				}

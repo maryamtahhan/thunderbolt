@@ -27,11 +27,10 @@ import (
 	"path/filepath"
 	"strings"
 
-
 	v1 "github.com/google/go-containerregistry/pkg/v1"
-
 	"github.com/google/go-containerregistry/pkg/v1/tarball"
 	"github.com/google/go-containerregistry/pkg/v1/types"
+	"github.com/gpuman/thunderbolt/pkg/utils"
 	"github.com/hashicorp/go-multierror"
 	"k8s.io/klog/v2"
 )
@@ -95,7 +94,7 @@ func loadImageFromTarball(path string) (v1.Image, error) {
 	return img, nil
 }
 
-func NewImgFetcher() (ImgFetcher) {
+func NewImgFetcher() ImgFetcher {
 	return &imgFetcher{fetcher: NewFetcher()}
 }
 
@@ -151,24 +150,24 @@ func (e *tritonCacheExtractor) ExtractCache(img v1.Image) error {
 		if err != nil {
 			return fmt.Errorf("could not extract the Triton Cache from the container image %v", err)
 		}
-		os.Remove("test.tar") //TODO Cleanup the tmp file created
+		utils.CleanupTmpDirs()
 		return nil
 	}
 
 	// We try to parse it as the "compat" variant image with a single "application/vnd.oci.image.layer.v1.tar+gzip" layer.
 	_, errCompat := extractOCIStandardImg(img)
 	if errCompat == nil {
-		os.Remove("test.tar") //TODO Cleanup the tmp file created
+		utils.CleanupTmpDirs()
 		return nil
 	}
 
 	// Otherwise, we try to parse it as the *oci* variant image with custom artifact media types.
 	_, errOCI := extractOCIArtifactImg(img)
 	if errOCI == nil {
-		os.Remove("test.tar") //TODO better cleanup
+		utils.CleanupTmpDirs()
 		return nil
 	}
-	os.Remove("test.tar") //TODO better cleanup
+	utils.CleanupTmpDirs()
 
 	// We failed to parse the image in any format, so wrap the errors and return.
 	return fmt.Errorf("the given image is in invalid format as an OCI image: %v",

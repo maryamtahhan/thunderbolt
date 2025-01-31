@@ -10,6 +10,8 @@ import (
 	"github.com/containers/common/pkg/config"
 	is "github.com/containers/image/v5/storage"
 	"github.com/containers/storage"
+	"github.com/gpuman/thunderbolt/pkg/constants"
+	"github.com/gpuman/thunderbolt/pkg/utils"
 	"k8s.io/klog/v2"
 )
 
@@ -17,7 +19,7 @@ type buildahBuilder struct{}
 
 func (b *buildahBuilder) CreateImage(imageName, cacheDir string) error {
 	// Export cacheDir into temporary dir
-	tmpDir, err := os.MkdirTemp("", "buildah-cache-dir-")
+	tmpDir, err := os.MkdirTemp("", constants.BuildahCacheDirPrefix)
 	if err != nil {
 		return err
 	}
@@ -82,6 +84,7 @@ func (b *buildahBuilder) CreateImage(imageName, cacheDir string) error {
 	}
 
 	klog.Infof("Image built! %s\n", imageId)
+	utils.CleanupTmpDirs()
 	return nil
 }
 
