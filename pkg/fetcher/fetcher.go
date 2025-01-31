@@ -23,24 +23,28 @@ func NewFetcher() Fetcher {
 
 	if utils.HasApp("podman") {
 		localFetcher = append(localFetcher, &dockerFetcher{})
-	} else if utils.HasApp("docker") {
+	}
+	if utils.HasApp("docker") {
 		localFetcher = append(localFetcher, &podmanFetcher{})
-	} else {
-		localFetcher = nil
 	}
 
 	return &fetcher{local: localFetcher, remote: &remoteFetcher{}}
 }
 
 func (f *fetcher) FetchImg(imgName string) (v1.Image, error) {
-	for _, f := range f.local {
-		// Try fetching the image locally
-		img, _ := f.FetchImg(imgName)
+	// Try to fetch locally first
+	for _, localFetcher := range f.local {
+		klog.V(4).Infof("Trying local fetcher: %T", localFetcher)
+
+		img, _ := localFetcher.FetchImg(imgName)
 		if img != nil {
+			klog.Infof("Image found locally using %T", localFetcher)
 			return img, nil
 		}
+
+		// If error or image is nil, log and continue to the next fetcher
+		klog.V(4).Infof("Failed to fetch image locally using %T:", localFetcher)
 	}
-	klog.V(4).Infof("couldn't retrieve the image locally %v, will try to retrieve from remote image registry", err)
 
 	// If local fetch fails, try fetching the image remotely
 	img, err := f.remote.FetchImg(imgName)

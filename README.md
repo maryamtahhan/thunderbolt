@@ -14,7 +14,7 @@ $ go build
 ## Usage
 
 ```bash
-$ ./thunderbolt -h
+$ ./_output/bin/linux_amd64/thunderbolt -h
 A GPU Kernel runtime container image management utility
 
 Usage:

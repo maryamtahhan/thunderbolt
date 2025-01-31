@@ -24,7 +24,7 @@ func (p *podmanFetcher) FetchImg(imgName string) (v1.Image, error) {
 		return nil, fmt.Errorf("failed to retrieve Podman socket for client")
 	}
 	klog.V(4).Info("Initialize Podman client")
-	// Initialize Podman client
+
 	ctx, err := bindings.NewConnection(context.Background(), socket)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create Podman client: %w", err)
@@ -68,6 +68,7 @@ func (p *podmanFetcher) FetchImg(imgName string) (v1.Image, error) {
 func getPodmanSock() string {
 	// Default socket path for rootful Podman
 	defaultSock := "/run/podman/podman.sock"
+
 	// Check if the default rootful socket exists
 	if _, err := os.Stat(defaultSock); err == nil {
 		// If it exists, return the correct socket syntax
@@ -78,7 +79,6 @@ func getPodmanSock() string {
 	// Check for rootless Podman socket (user-specific path)
 	usr, err := user.Current()
 	if err != nil {
-		fmt.Println("Error getting current user:", err)
 		return ""
 	}
 
@@ -95,7 +95,6 @@ func getPodmanSock() string {
 
 	output, err := exec.Command(app, args).Output()
 	if err != nil {
-		fmt.Printf("Error running podman command: %v\n", err)
 		return ""
 	}
 
@@ -106,6 +105,5 @@ func getPodmanSock() string {
 		return "unix://" + socketPath
 	}
 
-	// If the socket path is empty, return an empty string or error message
 	return ""
 }
