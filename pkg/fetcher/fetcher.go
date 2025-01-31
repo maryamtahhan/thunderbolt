@@ -29,7 +29,7 @@ func NewFetcher() Fetcher {
 	switch fetcherType {
 	case "docker":
 		localFetcher = &dockerFetcher{}
-	case "buildah":
+	case "podman":
 		localFetcher = &podmanFetcher{}
 	default:
 		localFetcher = nil

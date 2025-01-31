@@ -19,7 +19,7 @@ func (r *remoteFetcher) FetchImg(imgName string) (v1.Image, error) {
 		return nil, fmt.Errorf("failed to parse image name: %w", err)
 	}
 
-	klog.V(4).Infof("Retrieve remote Img %v!!!!!!!!", err)
+	klog.V(4).Infof("Retrieve remote Img %v!!!!!!!!", imgName)
 	img, err := remote.Image(ref, remote.WithAuthFromKeychain(authn.DefaultKeychain))
 	if err != nil {
 		return nil, fmt.Errorf("failed to fetch image: %w", err)
