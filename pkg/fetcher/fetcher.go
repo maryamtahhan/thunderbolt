@@ -13,27 +13,19 @@ type Fetcher interface {
 }
 
 type fetcher struct {
-	local  Fetcher
+	local  []Fetcher
 	remote Fetcher
 }
 
 // Factory function to create a new Fetcher with the specified backend.
 func NewFetcher() Fetcher {
-	var localFetcher Fetcher
-	var fetcherType string
+	var localFetcher []Fetcher
 
 	if utils.HasApp("podman") {
-		fetcherType = "podman"
+		localFetcher = append(localFetcher, &dockerFetcher{})
 	} else if utils.HasApp("docker") {
-		fetcherType = "docker"
-	}
-
-	switch fetcherType {
-	case "docker":
-		localFetcher = &dockerFetcher{}
-	case "podman":
-		localFetcher = &podmanFetcher{}
-	default:
+		localFetcher = append(localFetcher, &podmanFetcher{})
+	} else {
 		localFetcher = nil
 	}
 
@@ -41,15 +33,17 @@ func NewFetcher() Fetcher {
 }
 
 func (f *fetcher) FetchImg(imgName string) (v1.Image, error) {
-	// Try fetching the image locally
-	img, err := f.local.FetchImg(imgName)
-	if img != nil {
-		return img, nil
+	for _, f := range f.local {
+		// Try fetching the image locally
+		img, _ := f.FetchImg(imgName)
+		if img != nil {
+			return img, nil
+		}
 	}
 	klog.V(4).Infof("couldn't retrieve the image locally %v, will try to retrieve from remote image registry", err)
 
 	// If local fetch fails, try fetching the image remotely
-	img, err = f.remote.FetchImg(imgName)
+	img, err := f.remote.FetchImg(imgName)
 	if err != nil || img == nil {
 		return nil, fmt.Errorf("failed to fetch image: %w", err)
 	}
