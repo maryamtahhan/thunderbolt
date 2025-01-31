@@ -7,7 +7,6 @@ import (
 	"os"
 	"path"
 
-	"github.com/docker/docker/api/types/image"
 	"github.com/docker/docker/client"
 	v1 "github.com/google/go-containerregistry/pkg/v1"
 	"github.com/gpuman/thunderbolt/pkg/constants"
@@ -23,48 +22,32 @@ func (d *dockerFetcher) FetchImg(imgName string) (v1.Image, error) {
 	}
 	defer apiClient.Close()
 
-	images, err := apiClient.ImageList(context.Background(), image.ListOptions{})
+	// Use the Docker client to save the image to a tarball
+	reader, err := apiClient.ImageSave(context.Background(), []string{imgName})
 	if err != nil {
-		return nil, fmt.Errorf("failed to retrieve Docker images: %w", err)
+		return nil, fmt.Errorf("failed to save image: %v", err)
+	}
+	defer reader.Close()
+
+	tmpDir, err := os.MkdirTemp("", constants.DockerCacheDirPrefix)
+	if err != nil {
+		return nil, err
 	}
 
-	// Iterate through images and check for matching name
-	for _, img := range images {
-		for _, tag := range img.RepoTags {
-			if tag == imgName {
-				fmt.Printf("Found local image: %s\n", tag)
-				//return &img, nil // Return the image if found
-				// Use the Docker client to save the image to a tarball
-				reader, err := apiClient.ImageSave(context.Background(), []string{imgName})
-				if err != nil {
-					return nil, fmt.Errorf("failed to save image: %v", err)
-				}
-				defer reader.Close()
+	// Create a tarball file where the image will be saved
+	tarballFilePath := path.Join(tmpDir, "tmp.tar")
+	tarballFile, err := os.Create(tarballFilePath)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create tarball file: %v", err)
+	}
+	defer tarballFile.Close()
 
-				tmpDir, err := os.MkdirTemp("", constants.DockerCacheDirPrefix)
-				if err != nil {
-					return nil, err
-				}
-
-				// Create a tarball file where the image will be saved
-				tarballFilePath := path.Join(tmpDir, "tmp.tar")
-				tarballFile, err := os.Create(tarballFilePath)
-				if err != nil {
-					return nil, fmt.Errorf("failed to create tarball file: %v", err)
-				}
-				defer tarballFile.Close()
-
-				// Copy the content from the reader to the tarball file
-				_, err = io.Copy(tarballFile, reader)
-				if err != nil {
-					return nil, fmt.Errorf("failed to copy data to tarball file: %v", err)
-				}
-
-				fmt.Printf("Saved image: %s\n", tarballFile.Name())
-				return loadImageFromTarball(tarballFilePath)
-			}
-		}
+	// Copy the content from the reader to the tarball file
+	_, err = io.Copy(tarballFile, reader)
+	if err != nil {
+		return nil, fmt.Errorf("failed to copy data to tarball file: %v", err)
 	}
 
-	return nil, fmt.Errorf("failed to create Docker client: %w", err)
+	fmt.Printf("Saved image: %s\n", tarballFile.Name())
+	return loadImageFromTarball(tarballFilePath)
 }

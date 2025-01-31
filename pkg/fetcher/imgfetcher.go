@@ -90,8 +90,9 @@ type ImgFetcher interface {
 func loadImageFromTarball(path string) (v1.Image, error) {
 	img, err := tarball.ImageFromPath(path, nil)
 	if err != nil {
-		return nil, fmt.Errorf("failed to load image from cache: %w", err)
+		return nil, fmt.Errorf("failed to load image from tarball: %w", err)
 	}
+	klog.V(4).Info("loaded image from tarball!!!!!!!!")
 	return img, nil
 }
 
