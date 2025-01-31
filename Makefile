@@ -25,7 +25,7 @@ export TIMESTAMP ?=$(shell echo $(BIN_TIMESTAMP) | tr -d ':' | tr 'T' '-' | tr -
 SRC_ROOT           := $(shell pwd)
 ARCH               := $(shell arch)
 OUTPUT_DIR         := _output
-CROSS_BUILD_BINDIR := $(OUTPUT_DIR)/bin
+BUILD_BINDIR := $(OUTPUT_DIR)/bin
 GIT_VERSION        := $(shell git describe --dirty --tags --always --match='v*')
 GIT_SHA            := $(shell git rev-parse HEAD)
 GIT_BRANCH         := $(shell git rev-parse --abbrev-ref HEAD)
@@ -71,19 +71,29 @@ build: clean_build_local _build_local  ##  Build binary and copy to $(OUTPUT_DIR
 .PHONY: build
 
 _build_local:  ##  Build Thunderbolt binary locally.
-	@mkdir -p "$(CROSS_BUILD_BINDIR)/$(GOOS)_$(GOARCH)"
+	@mkdir -p "$(BUILD_BINDIR)/$(GOOS)_$(GOARCH)"
 	+@$(GOENV) go build \
 		-v -tags ${GO_BUILD_TAGS} \
 		-ldflags "$(LDFLAGS)" \
-		-o $(CROSS_BUILD_BINDIR)/$(GOOS)_$(GOARCH)/thunderbolt \
+		-o $(BUILD_BINDIR)/$(GOOS)_$(GOARCH)/thunderbolt \
 		./cmd/main.go
 
 ## toolkit ###
 .PHONY: tidy-vendor
 tidy-vendor:
+	@echo "******     tidy-vendor     ******"
+	@echo
 	go mod tidy -v
 	go mod vendor
-
+	@echo
+	@echo
 
 clean_build_local: ## Clean local build directory
-	rm -rf $(CROSS_BUILD_BINDIR)
+	rm -rf $(BUILD_BINDIR)
+
+format:
+	@echo "******     Go Format     ******"
+	@echo
+	./hack/gofmt.sh
+	@echo
+	@echo
