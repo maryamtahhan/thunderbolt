@@ -8,7 +8,7 @@ A GPU Kernel runtime container packaging utility inspired by
 ## Build
 
 ```bash
-$ go build
+go build
 ```
 
 ## Usage
@@ -60,6 +60,7 @@ Img Digest: sha256:b6d7703261642df0bf95175a64a01548eb4baf265c5755c30ede0fea03cd5
 Img Size: 525
 bash-4.4#
 ```
+
 This will extract the cache directory from the `quay.io/mtahhan/triton-cache:01-vector-add-latest`
 container image and copy it to  `~/.triton/cache/`.
 

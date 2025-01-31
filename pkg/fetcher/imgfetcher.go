@@ -37,7 +37,7 @@ import (
 )
 
 // A quick list of TODOS:
-// 1. Add image caching to avoid the overhead of pulling the images down everytime
+// 1. Add image caching to avoid the overhead of pulling the images down every time
 // 2. Don't create directories/files in $HOME/.triton/cache if they already exist.
 
 type tritonCacheExtractor struct{}

@@ -1,7 +1,7 @@
 
 # Triton Image Specification v0.0.0
 
-## Introduction:
+## Introduction
 
 This document describes a variant of Triton Artifact Image Specification
 which leverages the compatible layer media types. We call this variant "compat".
@@ -18,7 +18,7 @@ registries which don't yet support custom media types.
 ### Layer
 
 The *compat* variant must have the 1 layer whose media type is one of the
-followings:
+following:
 
 - `application/vnd.oci.image.layer.v1.tar+gzip`
 - `application/vnd.docker.image.rootfs.diff.tar.gzip`
@@ -120,34 +120,33 @@ We assume that you have a Triton cache that you want to package as an image.
 `buildah ... from` command.
 
 ```bash
-$ buildah --name quay.io/mtahhan/triton-cache:01-vector-add-latest from scratch
+buildah --name quay.io/mtahhan/triton-cache:01-vector-add-latest from scratch
 ```
 
-2. Next, add the annotation described above via `buildah config` command
+1. Next, add the annotation described above via `buildah config` command
 
 ```bash
-$ buildah config --annotation "module.triton.image/variant=compat" quay.io/mtahhan/triton-cache:01-vector-add-latest
+buildah config --annotation "module.triton.image/variant=compat" quay.io/mtahhan/triton-cache:01-vector-add-latest
 ```
 
 > Note: This step is optional. See [Annotation](#annotation) section.
 
-
-3. Then copy the files into that base image by `buildah copy` command
+1. Then copy the files into that base image by `buildah copy` command
 to create the layer.
 
 ```bash
-$ buildah copy quay.io/mtahhan/triton-cache:01-vector-add-latest 01-vector-add-cache/ ./io.triton.cache
+buildah copy quay.io/mtahhan/triton-cache:01-vector-add-latest 01-vector-add-cache/ ./io.triton.cache
 612fd1391d341bcb9f738a4d0ed6a15095e68dfc3245d8a899af3ecb4b60b8b1
 ```
 
 > NOTE: you must execute `buildah copy` exactly once in order to end
 > up having only one layer in produced images**
 
-4. Now, you can build a *compat* image and push it to your registry
+1. Now, you can build a *compat* image and push it to your registry
 via `buildah commit` command
 
 ```bash
-$ buildah commit quay.io/mtahhan/triton-cache:01-vector-add-latest docker://quay.io/mtahhan/triton-cache:01-vector-add-latest
+buildah commit quay.io/mtahhan/triton-cache:01-vector-add-latest docker://quay.io/mtahhan/triton-cache:01-vector-add-latest
 ```
 
 ## Appendix 2: build a *compat* image with Docker CLI
@@ -174,14 +173,14 @@ COPY 01-vector-add-cache ./io.triton.cache
   at the end as only the last layer in produced images is going to be
   taken into account to obtain the files.
 
-2. Then, build your image via `docker build` command
+1. Then, build your image via `docker build` command
 
 ```bash
-$ docker build -t quay.io/mtahhan/triton-cache:01-vector-add-latest .
+docker build -t quay.io/mtahhan/triton-cache:01-vector-add-latest .
 ```
 
-3. Finally, push the image to your registry via `docker push` command
+1. Finally, push the image to your registry via `docker push` command
 
 ```bash
-$ docker push quay.io/mtahhan/triton-cache:01-vector-add-latest
+docker push quay.io/mtahhan/triton-cache:01-vector-add-latest
 ```

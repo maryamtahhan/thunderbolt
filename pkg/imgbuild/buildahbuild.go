@@ -79,7 +79,7 @@ func (b *buildahBuilder) CreateImage(imageName, cacheDir string) error {
 
 	imageId, _, _, err := builder.Commit(ctx, imageRef, commitOptions)
 	if err != nil {
-		return fmt.Errorf("error commiting the image: %v", err)
+		return fmt.Errorf("error committing the image: %v", err)
 	}
 
 	klog.Infof("Image built! %s\n", imageId)

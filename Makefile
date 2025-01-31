@@ -94,6 +94,6 @@ clean_build_local: ## Clean local build directory
 format:
 	@echo "******     Go Format     ******"
 	@echo
-	./hack/gofmt.sh
+	go fmt github.com/gpuman/thunderbolt/...
 	@echo
 	@echo
