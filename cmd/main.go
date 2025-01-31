@@ -80,7 +80,6 @@ func main() {
 	klog.InitFlags(nil)
 	defer klog.Flush()
 
-	// Define the CLI command using cobra
 	var rootCmd = &cobra.Command{
 		Use:   "thunderbolt",
 		Short: "A GPU Kernel runtime container image management utility",
@@ -112,14 +111,12 @@ func main() {
 	// Bind klog flags to Cobra's flag set
 	pflag.CommandLine.AddGoFlagSet(flag.CommandLine)
 
-	// Define the flags for the command-line arguments
 	rootCmd.Flags().StringVarP(&imageName, "image", "i", "", "OCI image name")
 	rootCmd.Flags().StringVarP(&cacheDirName, "dir", "d", "", "Triton Cache Directory")
 	rootCmd.Flags().BoolVarP(&createFlag, "create", "c", false, "Create OCI image")
 	rootCmd.Flags().BoolVarP(&extractFlag, "extract", "e", false, "Extract a Triton cache from an OCI image")
 	rootCmd.PersistentFlags().IntVarP(&logLevel, "log-level", "l", 0, "Set the logging verbosity level (0 = minimal, higher is more verbose)")
 
-	// Mark the image flag as required
 	rootCmd.MarkFlagRequired("image")
 
 	// Important to call from main()
@@ -128,7 +125,6 @@ func main() {
 	}
 	unshare.MaybeReexecUsingUserNamespace(false)
 
-	// Execute the root command
 	if err := rootCmd.Execute(); err != nil {
 		klog.Fatalf("Error: %v\n", err)
 	}
