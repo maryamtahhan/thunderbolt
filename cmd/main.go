@@ -17,7 +17,6 @@ limitations under the License.
 package main
 
 import (
-	"flag"
 	"fmt"
 	"os"
 
@@ -25,22 +24,18 @@ import (
 	"github.com/containers/storage/pkg/unshare"
 	"github.com/gpuman/thunderbolt/pkg/fetcher"
 	"github.com/gpuman/thunderbolt/pkg/imgbuild"
+	"github.com/gpuman/thunderbolt/pkg/logformat"
 	"github.com/gpuman/thunderbolt/pkg/utils"
+	logging "github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
-	"github.com/spf13/pflag"
-	"k8s.io/klog/v2"
 )
 
 const (
 	exitNormal       = 0
 	exitExtractError = 1
 	exitCreateError  = 2
+	exitLogError     = 3
 )
-
-func init() {
-	// Bind klog flags to Cobra
-	pflag.CommandLine.AddGoFlagSet(flag.CommandLine)
-}
 
 func getCacheImage(imageName string) error {
 	f := fetcher.New()
@@ -54,19 +49,17 @@ func createCacheImage(imageName, cacheDir string) error {
 		return fmt.Errorf("error checking cache file path: %v", err)
 	}
 
-	// Create a new builder instance
 	builder, _ := imgbuild.New()
 	if builder == nil {
 		return fmt.Errorf("failed to create builder")
 	}
 
-	// Create the OCI Image
 	err = builder.CreateImage(imageName, cacheDir)
 	if err != nil {
 		return fmt.Errorf("failed to create the OCI image: %v", err)
 	}
 
-	klog.Info("OCI image created successfully.")
+	logging.Info("OCI image created successfully.")
 	return nil
 }
 
@@ -75,48 +68,52 @@ func main() {
 	var cacheDirName string
 	var createFlag bool
 	var extractFlag bool
-	var logLevel int
+	var logLevel string
 
-	klog.InitFlags(nil)
-	defer klog.Flush()
+	logging.SetReportCaller(true)
+	logging.SetFormatter(logformat.Default)
 
 	var rootCmd = &cobra.Command{
 		Use:   "thunderbolt",
 		Short: "A GPU Kernel runtime container image management utility",
 		PersistentPreRun: func(cmd *cobra.Command, args []string) {
-			// Set klog verbosity level from `--log-level` flag
-			_ = flag.Set("v", fmt.Sprintf("%d", logLevel))
+			// logging
+			if err := logformat.ConfigureLogging(logLevel); err != nil {
+				logging.Errorf("Error configuring logging: %v", err)
+				os.Exit(exitLogError)
+			}
+
 		},
 		Run: func(cmd *cobra.Command, args []string) {
 			if createFlag {
 				if err := createCacheImage(imageName, cacheDirName); err != nil {
-					klog.Fatalf("Error creating image: %v\n", err)
+					logging.Fatalf("Error creating image: %v\n", err)
 					os.Exit(exitCreateError)
 				}
 			}
 
 			if extractFlag {
 				if err := getCacheImage(imageName); err != nil {
-					klog.Fatalf("Error extracting image: %v\n", err)
+					logging.Fatalf("Error extracting image: %v\n", err)
 					os.Exit(exitExtractError)
 				}
 			}
 
 			if !createFlag && !extractFlag {
-				klog.Error("No action specified. Use --create or --extract flag.")
+				logging.Error("No action specified. Use --create or --extract flag.")
 				os.Exit(exitNormal)
 			}
 		},
 	}
-	// Bind klog flags to Cobra's flag set
-	pflag.CommandLine.AddGoFlagSet(flag.CommandLine)
 
+	// Define flags for Cobra
 	rootCmd.Flags().StringVarP(&imageName, "image", "i", "", "OCI image name")
 	rootCmd.Flags().StringVarP(&cacheDirName, "dir", "d", "", "Triton Cache Directory")
 	rootCmd.Flags().BoolVarP(&createFlag, "create", "c", false, "Create OCI image")
 	rootCmd.Flags().BoolVarP(&extractFlag, "extract", "e", false, "Extract a Triton cache from an OCI image")
-	rootCmd.PersistentFlags().IntVarP(&logLevel, "log-level", "l", 0, "Set the logging verbosity level (0 = minimal, higher is more verbose)")
+	rootCmd.Flags().StringVarP(&logLevel, "log-level", "l", "", "Set the logging verbosity level: debug, info, warning or error")
 
+	// Ensure the image flag is required
 	rootCmd.MarkFlagRequired("image")
 
 	// Important to call from main()
@@ -125,7 +122,8 @@ func main() {
 	}
 	unshare.MaybeReexecUsingUserNamespace(false)
 
+	// Execute the Cobra command
 	if err := rootCmd.Execute(); err != nil {
-		klog.Fatalf("Error: %v\n", err)
+		logging.Fatalf("Error: %v\n", err)
 	}
 }

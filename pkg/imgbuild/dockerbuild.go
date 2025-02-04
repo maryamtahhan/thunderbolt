@@ -25,7 +25,7 @@ import (
 	"github.com/docker/docker/client"
 	"github.com/docker/docker/pkg/archive"
 	"github.com/gpuman/thunderbolt/pkg/utils"
-	"k8s.io/klog/v2"
+	logging "github.com/sirupsen/logrus"
 )
 
 type dockerBuilder struct{}
@@ -79,6 +79,6 @@ func (d *dockerBuilder) CreateImage(imageName, cacheDir string) error {
 	}
 
 	utils.CleanupTmpDirs()
-	klog.Info("Docker image built successfully")
+	logging.Info("Docker image built successfully")
 	return nil
 }

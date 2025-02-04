@@ -11,4 +11,6 @@ const (
 
 var (
 	TritonCacheDir = os.Getenv("HOME") + "/.triton/cache"
+	/* Logging */
+	LogLevels = []string{"debug", "info", "warning", "error"} // accepted log levels
 )

@@ -12,7 +12,7 @@ import (
 	"github.com/containers/storage"
 	"github.com/gpuman/thunderbolt/pkg/constants"
 	"github.com/gpuman/thunderbolt/pkg/utils"
-	"k8s.io/klog/v2"
+	logging "github.com/sirupsen/logrus"
 )
 
 type buildahBuilder struct{}
@@ -28,7 +28,7 @@ func (b *buildahBuilder) CreateImage(imageName, cacheDir string) error {
 	if err != nil {
 		return fmt.Errorf("error copying contents using cp: %v", err)
 	}
-	klog.V(4).Infof("%s", tmpDir)
+	logging.Debugf("%s", tmpDir)
 
 	buildStoreOptions, _ := storage.DefaultStoreOptions()
 	conf, err := config.Default()
@@ -82,7 +82,7 @@ func (b *buildahBuilder) CreateImage(imageName, cacheDir string) error {
 		return fmt.Errorf("error committing the image: %v", err)
 	}
 
-	klog.Infof("Image built! %s\n", imageId)
+	logging.Infof("Image built! %s\n", imageId)
 	utils.CleanupTmpDirs()
 	return nil
 }

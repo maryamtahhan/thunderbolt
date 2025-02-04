@@ -7,7 +7,7 @@ import (
 	"github.com/google/go-containerregistry/pkg/name"
 	v1 "github.com/google/go-containerregistry/pkg/v1"
 	"github.com/google/go-containerregistry/pkg/v1/remote"
-	"k8s.io/klog/v2"
+	logging "github.com/sirupsen/logrus"
 )
 
 type remoteFetcher struct{}
@@ -19,13 +19,13 @@ func (r *remoteFetcher) FetchImg(imgName string) (v1.Image, error) {
 		return nil, fmt.Errorf("failed to parse image name: %w", err)
 	}
 
-	klog.Infof("Retrieve remote Img %s!!!!!!!!", imgName)
+	logging.Infof("Retrieve remote Img %s!!!!!!!!", imgName)
 	img, err := remote.Image(ref, remote.WithAuthFromKeychain(authn.DefaultKeychain))
 	if err != nil {
 		return nil, fmt.Errorf("failed to fetch image: %w", err)
 	}
 
 	// Print the image details
-	klog.Info("Img fetched successfully!!!!!!!!")
+	logging.Info("Img fetched successfully!!!!!!!!")
 	return img, nil
 }

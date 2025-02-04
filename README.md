@@ -21,10 +21,12 @@ Usage:
   thunderbolt [flags]
 
 Flags:
-  -c, --create         Create - TODO
-  -e, --extract        Extract a Triton cache from an OCI image
-  -h, --help           help for thunderbolt
-  -i, --image string   OCI image name
+  -c, --create             Create OCI image
+  -d, --dir string         Triton Cache Directory
+  -e, --extract            Extract a Triton cache from an OCI image
+  -h, --help               help for thunderbolt
+  -i, --image string       OCI image name
+  -l, --log-level string   Set the logging verbosity level (debug, info, warning or error)
 ```
 
 > NOTE: The create option is a work in progress. For now
