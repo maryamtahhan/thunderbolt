@@ -6,7 +6,7 @@ import (
 	"strings"
 	"text/template"
 
-	"k8s.io/klog/v2"
+	logging "github.com/sirupsen/logrus"
 )
 
 const DockerfileTemplate = `FROM scratch
@@ -45,6 +45,6 @@ func generateDockerfile(imageName, CacheDir, outputPath string) error {
 		return fmt.Errorf("error executing template: %w", err)
 	}
 
-	klog.Infof("Dockerfile generated successfully at %s", outputPath)
+	logging.Infof("Dockerfile generated successfully at %s", outputPath)
 	return nil
 }

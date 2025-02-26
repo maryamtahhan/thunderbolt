@@ -10,7 +10,7 @@ import (
 	"github.com/docker/docker/client"
 	v1 "github.com/google/go-containerregistry/pkg/v1"
 	"github.com/gpuman/thunderbolt/pkg/constants"
-	"k8s.io/klog/v2"
+	logging "github.com/sirupsen/logrus"
 )
 
 type dockerFetcher struct{}
@@ -49,6 +49,6 @@ func (d *dockerFetcher) FetchImg(imgName string) (v1.Image, error) {
 		return nil, fmt.Errorf("failed to copy data to tarball file: %v", err)
 	}
 
-	klog.V(4).Infof("Saved image: %s\n", tarballFile.Name())
+	logging.Infof("Saved image: %s\n", tarballFile.Name())
 	return loadImageFromTarball(tarballFilePath)
 }
