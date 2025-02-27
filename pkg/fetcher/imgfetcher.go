@@ -25,11 +25,15 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 
 	v1 "github.com/google/go-containerregistry/pkg/v1"
 	"github.com/google/go-containerregistry/pkg/v1/tarball"
 	"github.com/google/go-containerregistry/pkg/v1/types"
+	"github.com/gpuman/thunderbolt/pkg/accelerator"
+	"github.com/gpuman/thunderbolt/pkg/accelerator/devices"
+	"github.com/gpuman/thunderbolt/pkg/config"
 	"github.com/gpuman/thunderbolt/pkg/constants"
 	"github.com/gpuman/thunderbolt/pkg/preflightcheck"
 	"github.com/gpuman/thunderbolt/pkg/utils"
@@ -41,7 +45,9 @@ import (
 // 1. Add image caching to avoid the overhead of pulling the images down every time
 // 2. Don't create directories/files in $HOME/.triton/cache if they already exist.
 
-type tritonCacheExtractor struct{}
+type tritonCacheExtractor struct {
+	acc accelerator.Accelerator
+}
 
 type imgMgr struct {
 	fetcher   ImgFetcher
@@ -60,9 +66,23 @@ type ImgMgr interface {
 
 // Factory function to create a new ImgMgr.
 func New() ImgMgr {
+	var a accelerator.Accelerator
+
+	if config.IsGPUEnabled() {
+		r := accelerator.GetRegistry()
+		acc, err := accelerator.New(config.GPU, true)
+		if err != nil {
+			logging.Errorf("failed to init GPU accelerators: %v", err)
+		} else {
+			r.MustRegister(acc) // Register the accelerator with the registry
+			a = acc
+		}
+		defer accelerator.Shutdown()
+	}
+
 	return &imgMgr{
 		fetcher:   NewImgFetcher(),
-		extractor: &tritonCacheExtractor{},
+		extractor: &tritonCacheExtractor{acc: a},
 	}
 }
 
@@ -145,25 +165,35 @@ func (e *tritonCacheExtractor) ExtractCache(img v1.Image) error {
 		// This case, assume we have docker images with "application/vnd.docker.distribution.manifest.v2+json"
 		// as the manifest media type. Note that the media type of manifest is Docker specific and
 		// all OCI images would have an empty string in .MediaType field.
-		_, err := extractDockerImg(img)
-		if err != nil {
+		data, ret := extractDockerImg(img)
+		if ret != nil {
 			return fmt.Errorf("could not extract the Triton Cache from the container image %v", err)
 		}
 		utils.CleanupTmpDirs()
+
+		if ret := compareTritonCacheToGPU(data, e.acc); ret != nil {
+			return fmt.Errorf("***** the gpu and triton cache are incompatible ****")
+		}
 		return nil
 	}
 
 	// We try to parse it as the "compat" variant image with a single "application/vnd.oci.image.layer.v1.tar+gzip" layer.
-	_, errCompat := extractOCIStandardImg(img)
+	data, errCompat := extractOCIStandardImg(img)
 	if errCompat == nil {
 		utils.CleanupTmpDirs()
+		if ret := compareTritonCacheToGPU(data, e.acc); ret != nil {
+			return fmt.Errorf("***** the GPU and Triton cache are incompatible ****")
+		}
 		return nil
 	}
 
 	// Otherwise, we try to parse it as the *oci* variant image with custom artifact media types.
-	_, errOCI := extractOCIArtifactImg(img)
+	data, errOCI := extractOCIArtifactImg(img)
 	if errOCI == nil {
 		utils.CleanupTmpDirs()
+		if err = compareTritonCacheToGPU(data, e.acc); err != nil {
+			return fmt.Errorf("***** the gpu and triton cache are incompatible ****")
+		}
 		return nil
 	}
 	utils.CleanupTmpDirs()
@@ -193,7 +223,7 @@ func (i *imgMgr) FetchAndExtractCache(imgName string) error {
 
 // extractOCIArtifactImg extracts the triton cache from the
 // *oci* variant Triton Kernel Cache image:  //TODO ADD URL
-func extractOCIArtifactImg(img v1.Image) ([]byte, error) {
+func extractOCIArtifactImg(img v1.Image) (*preflightcheck.Data, error) {
 	layers, err := img.Layers()
 	if err != nil {
 		return nil, fmt.Errorf("could not fetch layers: %v", err)
@@ -234,19 +264,18 @@ func extractOCIArtifactImg(img v1.Image) ([]byte, error) {
 	}
 	defer r.Close()
 
-	// Just read it since the content is already a GPU Kernel Cache/Binary as mentioned above.
-	ret, err := io.ReadAll(r)
+	data, err := extractTritonCacheDirectory(r)
 	if err != nil {
-		return nil, fmt.Errorf("could not extract io.triton.cache: %v", err)
+		return nil, fmt.Errorf("could not extract Triton Kernel Cache: %v", err)
 	}
-	return ret, nil
+	return data, nil
 }
 
 // extractDockerImg extracts the Triton Kernel Cache from the
 // *compat* variant GPU Kernel Cache/Binary image with the standard Docker
 // media type: application/vnd.docker.image.rootfs.diff.tar.gzip.
 // https://github.com/maryamtahhan/thunderbolt/blob/main/spec-compat.md
-func extractDockerImg(img v1.Image) ([]byte, error) {
+func extractDockerImg(img v1.Image) (*preflightcheck.Data, error) {
 	layers, err := img.Layers()
 	if err != nil {
 		return nil, fmt.Errorf("could not fetch layers: %v", err)
@@ -274,17 +303,17 @@ func extractDockerImg(img v1.Image) ([]byte, error) {
 	}
 	defer r.Close()
 
-	ret, err := extractTritonCacheDirectory(r)
+	data, err := extractTritonCacheDirectory(r)
 	if err != nil {
 		return nil, fmt.Errorf("could not extract Triton Kernel Cache: %v", err)
 	}
-	return ret, nil
+	return data, nil
 }
 
 // extractOCIStandardImg extracts the Triton Kernel Cache from the
 // *compat* variant Triton Kernel image with the standard OCI media type: application/vnd.oci.image.layer.v1.tar+gzip.
 // https://github.com/maryamtahhan/thunderbolt/blob/main/spec-compat.md
-func extractOCIStandardImg(img v1.Image) ([]byte, error) {
+func extractOCIStandardImg(img v1.Image) (*preflightcheck.Data, error) {
 	layers, err := img.Layers()
 	if err != nil {
 		return nil, fmt.Errorf("could not fetch layers: %v", err)
@@ -312,17 +341,18 @@ func extractOCIStandardImg(img v1.Image) ([]byte, error) {
 	}
 	defer r.Close()
 
-	ret, err := extractTritonCacheDirectory(r)
+	data, err := extractTritonCacheDirectory(r)
 	if err != nil {
 		return nil, fmt.Errorf("could not extract Triton Kernel Cache: %v", err)
 	}
-	return ret, nil
+	return data, nil
 }
 
 // Extracts the triton named "io.triton.cache" in a given reader for tar.gz.
 // This is only used for *compat* variant.
 // TODO add preflight checks here.
-func extractTritonCacheDirectory(r io.Reader) ([]byte, error) {
+func extractTritonCacheDirectory(r io.Reader) (*preflightcheck.Data, error) {
+	var data *preflightcheck.Data
 	gr, err := gzip.NewReader(r)
 	if err != nil {
 		return nil, fmt.Errorf("failed to parse layer as tar.gz: %v", err)
@@ -367,11 +397,12 @@ func extractTritonCacheDirectory(r io.Reader) ([]byte, error) {
 
 			// If the extracted file is a JSON, check it immediately
 			if strings.HasSuffix(filePath, ".json") {
-				_, err := preflightcheck.GetTritonCacheJSONData(filePath)
+				d, err := preflightcheck.GetTritonCacheJSONData(filePath)
 				if err != nil {
 					// TODO CLEAN UP on failure
 					return nil, fmt.Errorf("failed preflight check on %s: %w", filePath, err)
 				}
+				data = d
 			}
 
 		default:
@@ -379,7 +410,7 @@ func extractTritonCacheDirectory(r io.Reader) ([]byte, error) {
 		}
 	}
 
-	return nil, nil
+	return data, nil
 }
 
 // writeFile writes a file's content to disk from the tar reader
@@ -401,6 +432,47 @@ func writeFile(filePath string, tarReader io.Reader, mode os.FileMode) error {
 
 	if err := os.Chmod(filePath, mode); err != nil {
 		return fmt.Errorf("failed to set file permissions for %s: %w", filePath, err)
+	}
+
+	return nil
+}
+
+func compareTritonCacheToGPU(cacheData *preflightcheck.Data, acc accelerator.Accelerator) error {
+	if cacheData == nil {
+		return errors.New("cache data is nil")
+	}
+	if acc == nil {
+		return errors.New("acc is nil")
+	}
+	var devInfo []devices.TritonGPUInfo
+	if config.IsGPUEnabled() {
+		if gpu := accelerator.GetActiveAcceleratorByType(config.GPU); gpu != nil {
+			d := gpu.Device()
+			if tritonDevInfo, err := d.GetAllGPUInfo(); err == nil {
+				devInfo = tritonDevInfo
+			} else {
+				return errors.New("couldn't retrieve the GPU Triton info")
+			}
+		}
+	}
+
+	for _, gpuInfo := range devInfo {
+		gpuArch, err := strconv.Atoi(gpuInfo.Arch) // Convert GPU Arch string to int
+		if err != nil {
+			return fmt.Errorf("invalid GPU Arch format: %s", gpuInfo.Arch)
+		}
+
+		if cacheData.Target.Arch != gpuArch {
+			return fmt.Errorf("mismatch in architecture: cache=%d, gpu=%d", cacheData.Target.Arch, gpuArch)
+		}
+
+		if cacheData.Target.WarpSize != gpuInfo.WarpSize {
+			return fmt.Errorf("mismatch in warp size: cache=%d, gpu=%d", cacheData.Target.WarpSize, gpuInfo.WarpSize)
+		}
+
+		if cacheData.PtxVersion != nil && *cacheData.PtxVersion != gpuInfo.PTXVersion {
+			return fmt.Errorf("mismatch in PTX version: cache=%d, gpu=%d", *cacheData.PtxVersion, gpuInfo.PTXVersion)
+		}
 	}
 
 	return nil
