@@ -22,7 +22,6 @@ import (
 
 	"github.com/containers/buildah"
 	"github.com/containers/storage/pkg/unshare"
-	"github.com/gpuman/thunderbolt/pkg/accelerator"
 	"github.com/gpuman/thunderbolt/pkg/config"
 	"github.com/gpuman/thunderbolt/pkg/fetcher"
 	"github.com/gpuman/thunderbolt/pkg/imgbuild"
@@ -125,16 +124,6 @@ func main() {
 	unshare.MaybeReexecUsingUserNamespace(false)
 
 	config.SetEnabledGPU(true) // ASSUME TRUE FOR NOW
-
-	if config.IsGPUEnabled() {
-		r := accelerator.GetRegistry()
-		if a, err := accelerator.New(config.GPU, true); err == nil {
-			r.MustRegister(a) // Register the accelerator with the registry
-		} else {
-			logging.Errorf("failed to init GPU accelerators: %v", err)
-		}
-		defer accelerator.Shutdown()
-	}
 
 	// Execute the Cobra command
 	if err := rootCmd.Execute(); err != nil {
