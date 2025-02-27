@@ -54,6 +54,8 @@ type TritonGPUInfo struct {
 	// For ROCm, we might also include fields like "GFXVersion" (or something similar) to capture the
 	// specific AMD architecture version (e.g., GFX906 for Vega).
 	GFXVersion string // For ROCm-specific architecture details
+
+	Backend string
 }
 
 type GPUDevice struct {
