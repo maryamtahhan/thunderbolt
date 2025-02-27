@@ -22,4 +22,4 @@ const (
 	defaultKubeConfig = ""
 )
 
-var ConfDir string = "/etc/thunderbolt/thunderbolt.config"
+var ConfDir string = "/tmp/thunderbolt/thunderbolt.config"

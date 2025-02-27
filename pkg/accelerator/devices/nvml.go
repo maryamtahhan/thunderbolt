@@ -190,6 +190,7 @@ func getNVMLTritonGPUInfo(device nvml.Device) (TritonGPUInfo, error) {
 		WarpSize:          warpSize,
 		MemoryTotalMB:     mem.Total / (1024 * 1024),
 		PTXVersion:        ptxVersion,
+		Backend:           "cuda",
 	}, nil
 }
 

@@ -44,18 +44,19 @@ type Config struct {
 	Thunderbolt   ThunderboltConfig
 }
 
-// newConfig creates and returns a new Config instance.
 func newConfig() (*Config, error) {
+	// Ensure the directory exists or create it
 	absBaseDir, err := filepath.Abs(ConfDir)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get absolute path for config-dir: %s: %w", ConfDir, err)
 	}
 
+	// Check if the directory exists
 	s, err := os.Stat(absBaseDir)
 	if os.IsNotExist(err) {
-		// if the directory does not exist, create it
+		// If it doesn't exist, create it
 		if err = os.MkdirAll(absBaseDir, 0755); err != nil {
-			return nil, fmt.Errorf("config-dir %s does not exist", ConfDir)
+			return nil, fmt.Errorf("failed to create config-dir %s: %w", ConfDir, err)
 		}
 		s, err = os.Stat(absBaseDir)
 		if err != nil {
@@ -66,6 +67,7 @@ func newConfig() (*Config, error) {
 		return nil, fmt.Errorf("config-dir %s is not a directory", ConfDir)
 	}
 
+	// Proceed to create and return the Config instance
 	return &Config{
 		Thunderbolt:   getThunderboltConfig(),
 		KernelVersion: float32(0),

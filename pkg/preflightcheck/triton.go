@@ -2,14 +2,19 @@ package preflightcheck
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"os"
+	"strconv"
 
+	"github.com/gpuman/thunderbolt/pkg/accelerator"
+	"github.com/gpuman/thunderbolt/pkg/accelerator/devices"
+	"github.com/gpuman/thunderbolt/pkg/config"
 	logging "github.com/sirupsen/logrus"
 )
 
 // Define the struct matching the JSON structure
-type Data struct {
+type TritonCacheData struct {
 	Hash                      string     `json:"hash"`
 	Target                    Target     `json:"target"`
 	NumWarps                  int        `json:"num_warps"`
@@ -41,14 +46,14 @@ type Target struct {
 	WarpSize int    `json:"warp_size"`
 }
 
-func GetTritonCacheJSONData(filePath string) (*Data, error) {
+func GetTritonCacheJSONData(filePath string) (*TritonCacheData, error) {
 	content, err := os.ReadFile(filePath)
 	if err != nil {
 		logging.Errorf("Failed to read file %s: %v", filePath, err)
 		return nil, fmt.Errorf("failed to read file %s: %v", filePath, err)
 	}
 
-	var data Data
+	var data TritonCacheData
 	if err = json.Unmarshal(content, &data); err != nil {
 		logging.Errorf("Failed to parse JSON in file %s: %v", filePath, err)
 		return nil, fmt.Errorf("failed to parse JSON in file %s: %v", filePath, err)
@@ -69,4 +74,45 @@ func GetTritonCacheJSONData(filePath string) (*Data, error) {
 
 	logging.Debugf("Cache JSON output:\n%s", string(prettyJSON))
 	return &data, nil
+}
+
+func CompareTritonCacheToGPU(cacheData *TritonCacheData, acc accelerator.Accelerator) error {
+	if cacheData == nil {
+		return errors.New("cache data is nil")
+	}
+	if acc == nil {
+		return errors.New("acc is nil")
+	}
+	var devInfo []devices.TritonGPUInfo
+	if config.IsGPUEnabled() {
+		if gpu := accelerator.GetActiveAcceleratorByType(config.GPU); gpu != nil {
+			d := gpu.Device()
+			if tritonDevInfo, err := d.GetAllGPUInfo(); err == nil {
+				devInfo = tritonDevInfo
+			} else {
+				return errors.New("couldn't retrieve the GPU Triton info")
+			}
+		}
+	}
+
+	for _, gpuInfo := range devInfo {
+		gpuArch, err := strconv.Atoi(gpuInfo.Arch) // Convert GPU Arch string to int
+		if err != nil {
+			return fmt.Errorf("invalid GPU Arch format: %s", gpuInfo.Arch)
+		}
+
+		if cacheData.Target.Arch != gpuArch {
+			return fmt.Errorf("mismatch in architecture: cache=%d, gpu=%d", cacheData.Target.Arch, gpuArch)
+		}
+
+		if cacheData.Target.WarpSize != gpuInfo.WarpSize {
+			return fmt.Errorf("mismatch in warp size: cache=%d, gpu=%d", cacheData.Target.WarpSize, gpuInfo.WarpSize)
+		}
+
+		if cacheData.PtxVersion != nil && *cacheData.PtxVersion != gpuInfo.PTXVersion {
+			return fmt.Errorf("mismatch in PTX version: cache=%d, gpu=%d", *cacheData.PtxVersion, gpuInfo.PTXVersion)
+		}
+	}
+
+	return nil
 }

@@ -103,6 +103,7 @@ func (r *gpuRocm) Init() error {
 				WarpSize:          64,                       // AMD GPUs use 64-thread wavefronts
 				MemoryTotalMB:     memTotal / (1024 * 1024), // Convert bytes to MB
 				GFXVersion:        info.DriverVersion,
+				Backend:           "rocm",
 			},
 		}
 	}
@@ -117,23 +118,23 @@ func (r *gpuRocm) Shutdown() bool {
 
 // Fetches all GPUs' info in **one single rocm-smi call**
 func getAllRocmGPUInfo() (map[int]ROCMGPUInfo, error) {
-	cmd := exec.Command("rocm-smi",
-		"--json",
-		"--showdriverversion",
-		"--showuniqueid",
-		"--showserial",
-		"--showmeminfo",
-		"all")
+	cmd := exec.Command("rocm-smi", "--json", "--showdriverversion", "--showuniqueid", "--showserial", "--showmeminfo", "all")
 	output, err := cmd.Output()
 	if err != nil {
 		return nil, fmt.Errorf("failed to execute rocm-smi: %v", err)
 	}
 
-	// Parse JSON into map of GPUs
 	var gpuInfo map[string]ROCMGPUInfo
 	if err := json.Unmarshal(output, &gpuInfo); err != nil {
 		return nil, fmt.Errorf("failed to parse rocm-smi output: %v", err)
 	}
+
+	prettyJSON, err := json.MarshalIndent(gpuInfo, "", "  ")
+	if err != nil {
+		return nil, fmt.Errorf("failed to pretty print JSON: %v", err)
+	}
+
+	logging.Debugf("ROCM JSON output:\n%s", string(prettyJSON))
 
 	// Convert map keys from "GPUX" to int keys
 	parsedGPUs := make(map[int]ROCMGPUInfo)
@@ -141,8 +142,16 @@ func getAllRocmGPUInfo() (map[int]ROCMGPUInfo, error) {
 		var gpuID int
 		_, err := fmt.Sscanf(key, "GPU%d", &gpuID)
 		if err == nil {
+			// Check for missing fields and set defaults if necessary
+			if gpu.SerialNumber == "" {
+				gpu.SerialNumber = "Unknown"
+			}
+			if gpu.DriverVersion == "" {
+				gpu.DriverVersion = "Unknown"
+			}
 			parsedGPUs[gpuID] = gpu
 		}
+		logging.Infof("GPU %d - Serial: %s, Driver: %s, Memory: %s", gpuID, gpu.SerialNumber, gpu.DriverVersion, gpu.MemoryTotalB)
 	}
 
 	return parsedGPUs, nil

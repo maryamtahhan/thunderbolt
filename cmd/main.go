@@ -74,6 +74,13 @@ func main() {
 	logging.SetReportCaller(true)
 	logging.SetFormatter(logformat.Default)
 
+	// Initialize the config
+	_, err := config.Initialize(config.ConfDir)
+	if err != nil {
+		logging.Fatalf("Error initializing config: %v\n", err)
+		os.Exit(exitLogError)
+	}
+
 	var rootCmd = &cobra.Command{
 		Use:   "thunderbolt",
 		Short: "A GPU Kernel runtime container image management utility",

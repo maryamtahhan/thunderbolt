@@ -44,7 +44,7 @@ type (
 )
 
 func (d DeviceType) String() string {
-	return [...]string{"MOCK", "NVML"}[d]
+	return [...]string{"MOCK", "NVML", "ROCM"}[d]
 }
 
 type Device interface {
@@ -94,6 +94,7 @@ func SetRegistry(registry *Registry) {
 func registerDevices(r *Registry) {
 	// Call individual device check functions
 	nvmlCheck(r)
+	rocmCheck(r)
 }
 
 func (r *Registry) MustRegister(a string, d DeviceType, deviceStartup deviceStartupFunc) {
