@@ -27,6 +27,7 @@ import (
 const (
 	MOCK DeviceType = iota
 	NVML
+	ROCM
 )
 
 var (
