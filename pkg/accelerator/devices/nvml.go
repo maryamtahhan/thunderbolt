@@ -27,7 +27,8 @@ import (
 )
 
 const (
-	nvmlHwType = config.GPU
+	nvmlHwType   = config.GPU
+	NVMLWarpSize = 32
 )
 
 var (
@@ -64,7 +65,7 @@ func nvmlDeviceStartup() Device {
 		logging.Errorf("failed to Init device: %v", err)
 		return nil
 	}
-	logging.Infof("Using %s to obtain gpu power", nvmlType.String())
+	logging.Infof("Using %s to obtain GPU info", nvmlType.String())
 	return &a
 }
 
@@ -134,7 +135,7 @@ func (n *gpuNvml) Init() (err error) {
 			}
 		}
 
-		tritonInfo, err := getTritonGPUInfo(device)
+		tritonInfo, err := getNVMLTritonGPUInfo(device)
 		if err != nil {
 			return err
 		}
@@ -159,27 +160,7 @@ func (n *gpuNvml) Shutdown() bool {
 	return nvml.Shutdown() == nvml.SUCCESS
 }
 
-func getWarpSize(major, minor int) int {
-	// Map known compute capabilities to their respective warp sizes
-	switch {
-	case major == 3: // Kepler (e.g., GK110)
-		return 32
-	case major == 5: // Maxwell (e.g., GM200)
-		return 32
-	case major == 6: // Pascal (e.g., GP100)
-		return 32
-	case major == 7: // Volta (e.g., GV100)
-		return 32
-	case major == 8: // Turing (e.g., TU102)
-		return 32
-	case major == 8 && minor >= 6: // Ampere (e.g., GA100)
-		return 32
-	default:
-		return 32 // Default to 32 if unknown
-	}
-}
-
-func getTritonGPUInfo(device nvml.Device) (TritonGPUInfo, error) {
+func getNVMLTritonGPUInfo(device nvml.Device) (TritonGPUInfo, error) {
 	name, _ := device.GetName()
 	uuid, _ := device.GetUUID()
 
@@ -187,7 +168,7 @@ func getTritonGPUInfo(device nvml.Device) (TritonGPUInfo, error) {
 	major, minor, _ := device.GetCudaComputeCapability()
 
 	mem, _ := device.GetMemoryInfo()
-	warpSize := getWarpSize(major, minor)
+	warpSize := NVMLWarpSize
 	driverVersion, _ := nvml.SystemGetDriverVersion()
 	// Split the version string to extract the major version
 	versionParts := strings.Split(driverVersion, ".")
