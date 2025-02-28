@@ -24,11 +24,34 @@ type gpuRocm struct {
 }
 
 type ROCMGPUInfo struct {
-	Name          string `json:"Card model"`
-	UUID          string `json:"Unique ID"`
-	SerialNumber  string `json:"Serial Number"`
-	DriverVersion string `json:"Driver version"`
-	MemoryTotalB  string `json:"VRAM Total Memory (B)"` // Stored as string in JSON
+	GPUInfo map[int]*ROCMCardInfo
+	DrvInfo *ROCMSystemInfo
+}
+
+type ROCMCardInfo struct {
+	UniqueID           string `json:"Unique ID"`
+	SerialNumber       string `json:"Serial Number"`
+	VRAMTotalMemory    string `json:"VRAM Total Memory (B)"`
+	VRAMUsedMemory     string `json:"VRAM Total Used Memory (B)"`
+	VISVRAMTotalMemory string `json:"VIS_VRAM Total Memory (B)"`
+	VISVRAMUsedMemory  string `json:"VIS_VRAM Total Used Memory (B)"`
+	GTTTotalMemory     string `json:"GTT Total Memory (B)"`
+	GTTUsedMemory      string `json:"GTT Total Used Memory (B)"`
+	CardSeries         string `json:"Card Series"`
+	CardModel          string `json:"Card Model"`
+	CardVendor         string `json:"Card Vendor"`
+	CardSKU            string `json:"Card SKU"`
+	SubsystemID        string `json:"Subsystem ID"`
+	DeviceRev          string `json:"Device Rev"`
+	NodeID             string `json:"Node ID"`
+	GUID               string `json:"GUID"`
+	GFXVersion         string `json:"GFX Version"`
+}
+
+type ROCMSystemInfo struct {
+	System struct {
+		DriverVersion string `json:"Driver version"`
+	} `json:"system"`
 }
 
 func rocmCheck(r *Registry) {
@@ -89,21 +112,20 @@ func (r *gpuRocm) Init() error {
 	}
 
 	// Populate the devices map
-	r.devices = make(map[int]GPUDevice, len(gpuInfoList))
-	for gpuID, info := range gpuInfoList {
-		memTotal, _ := strconv.ParseUint(info.MemoryTotalB, 10, 64)
-
+	r.devices = make(map[int]GPUDevice, len(gpuInfoList.GPUInfo))
+	for gpuID, info := range gpuInfoList.GPUInfo {
+		memTotal, _ := strconv.ParseUint(info.VRAMTotalMemory, 10, 64)
+		name := "card" + strconv.Itoa(gpuID)
 		r.devices[gpuID] = GPUDevice{
 			ID: gpuID,
 			TritonInfo: TritonGPUInfo{
-				Name:              info.Name,
-				UUID:              info.UUID,
-				ComputeCapability: "",                       // ROCm doesn't expose compute capability like CUDA
-				Arch:              info.DriverVersion,       // Using driver version as a proxy for arch
-				WarpSize:          64,                       // AMD GPUs use 64-thread wavefronts
-				MemoryTotalMB:     memTotal / (1024 * 1024), // Convert bytes to MB
-				GFXVersion:        info.DriverVersion,
-				Backend:           "rocm",
+				Name:              name,
+				UUID:              info.UniqueID,
+				ComputeCapability: "",
+				Arch:              info.GFXVersion,
+				WarpSize:          64,
+				MemoryTotalMB:     memTotal / (1024 * 1024),
+				Backend:           "hip",
 			},
 		}
 	}
@@ -116,15 +138,31 @@ func (r *gpuRocm) Shutdown() bool {
 	return true
 }
 
+func getAllRocmGPUInfo() (*ROCMGPUInfo, error) {
+	gpus, err := getRocmGPUInfo()
+	if err != nil {
+		return nil, fmt.Errorf("could not get GPU info")
+	}
+	system, err := getRocmSystemInfo()
+	if err != nil {
+		return nil, fmt.Errorf("could not get system info")
+	}
+
+	return &ROCMGPUInfo{
+		GPUInfo: gpus,
+		DrvInfo: system,
+	}, nil
+}
+
 // Fetches all GPUs' info in **one single rocm-smi call**
-func getAllRocmGPUInfo() (map[int]ROCMGPUInfo, error) {
-	cmd := exec.Command("rocm-smi", "--json", "--showdriverversion", "--showuniqueid", "--showserial", "--showmeminfo", "all")
+func getRocmGPUInfo() (map[int]*ROCMCardInfo, error) {
+	cmd := exec.Command("rocm-smi", "--json", "--showproductname", "--showuniqueid", "--showserial", "--showmeminfo", "all")
 	output, err := cmd.Output()
 	if err != nil {
 		return nil, fmt.Errorf("failed to execute rocm-smi: %v", err)
 	}
 
-	var gpuInfo map[string]ROCMGPUInfo
+	var gpuInfo map[string]*ROCMCardInfo
 	if err := json.Unmarshal(output, &gpuInfo); err != nil {
 		return nil, fmt.Errorf("failed to parse rocm-smi output: %v", err)
 	}
@@ -137,24 +175,39 @@ func getAllRocmGPUInfo() (map[int]ROCMGPUInfo, error) {
 	logging.Debugf("ROCM JSON output:\n%s", string(prettyJSON))
 
 	// Convert map keys from "GPUX" to int keys
-	parsedGPUs := make(map[int]ROCMGPUInfo)
+	parsedGPUs := make(map[int]*ROCMCardInfo)
 	for key, gpu := range gpuInfo {
 		var gpuID int
-		_, err := fmt.Sscanf(key, "GPU%d", &gpuID)
+		_, err := fmt.Sscanf(key, "card%d", &gpuID)
 		if err == nil {
-			// Check for missing fields and set defaults if necessary
-			if gpu.SerialNumber == "" {
-				gpu.SerialNumber = "Unknown"
-			}
-			if gpu.DriverVersion == "" {
-				gpu.DriverVersion = "Unknown"
-			}
 			parsedGPUs[gpuID] = gpu
 		}
-		logging.Infof("GPU %d - Serial: %s, Driver: %s, Memory: %s", gpuID, gpu.SerialNumber, gpu.DriverVersion, gpu.MemoryTotalB)
 	}
 
 	return parsedGPUs, nil
+}
+
+// Fetches all GPUs' info in **one single rocm-smi call**
+func getRocmSystemInfo() (*ROCMSystemInfo, error) {
+	cmd := exec.Command("rocm-smi", "--json", "--showdriverversion")
+	output, err := cmd.Output()
+	if err != nil {
+		return nil, fmt.Errorf("failed to execute rocm-smi: %v", err)
+	}
+
+	var systemInfo ROCMSystemInfo
+	if err = json.Unmarshal(output, &systemInfo); err != nil {
+		return nil, fmt.Errorf("failed to parse rocm-smi output: %v", err)
+	}
+
+	prettyJSON, err := json.MarshalIndent(systemInfo, "", "  ")
+	if err != nil {
+		return nil, fmt.Errorf("failed to pretty print JSON: %v", err)
+	}
+
+	logging.Debugf("ROCM JSON output:\n%s", string(prettyJSON))
+
+	return &systemInfo, nil
 }
 
 // GetAllGPUInfo returns a list of GPU info for all devices
@@ -162,7 +215,7 @@ func (r *gpuRocm) GetAllGPUInfo() ([]TritonGPUInfo, error) {
 	var allTritonInfo []TritonGPUInfo
 	for gpuID, dev := range r.devices {
 		allTritonInfo = append(allTritonInfo, dev.TritonInfo)
-		logging.Infof("GPU %d: %+v", gpuID, dev.TritonInfo)
+		logging.Debugf("GPU %d: %+v", gpuID, dev.TritonInfo)
 	}
 	return allTritonInfo, nil
 }

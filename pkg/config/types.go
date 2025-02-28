@@ -22,4 +22,5 @@ const (
 	defaultKubeConfig = ""
 )
 
-var ConfDir string = "/tmp/thunderbolt/thunderbolt.config"
+var ConfDir string = "/tmp/thunderbolt/"
+var ConfFile string = "thunderbolt.config"

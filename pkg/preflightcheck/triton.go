@@ -5,7 +5,6 @@ import (
 	"errors"
 	"fmt"
 	"os"
-	"strconv"
 
 	"github.com/gpuman/thunderbolt/pkg/accelerator"
 	"github.com/gpuman/thunderbolt/pkg/accelerator/devices"
@@ -32,6 +31,7 @@ type TritonCacheData struct {
 	ExternLibs                [][]string `json:"extern_libs"`
 	Debug                     bool       `json:"debug"`
 	BackendName               string     `json:"backend_name"`
+	Arch                      string     `json:"arch"`
 	SanitizeOverflow          bool       `json:"sanitize_overflow"`
 	Shared                    int        `json:"shared"`
 	GlobalScratchSize         int        `json:"global_scratch_size"`
@@ -41,9 +41,9 @@ type TritonCacheData struct {
 
 // Nested struct for the "target" field
 type Target struct {
-	Backend  string `json:"backend"`
-	Arch     int    `json:"arch"`
-	WarpSize int    `json:"warp_size"`
+	Backend  string      `json:"backend"`
+	Arch     json.Number `json:"arch"`
+	WarpSize int         `json:"warp_size"`
 }
 
 func GetTritonCacheJSONData(filePath string) (*TritonCacheData, error) {
@@ -83,6 +83,7 @@ func CompareTritonCacheToGPU(cacheData *TritonCacheData, acc accelerator.Acceler
 	if acc == nil {
 		return errors.New("acc is nil")
 	}
+
 	var devInfo []devices.TritonGPUInfo
 	if config.IsGPUEnabled() {
 		if gpu := accelerator.GetActiveAcceleratorByType(config.GPU); gpu != nil {
@@ -95,24 +96,40 @@ func CompareTritonCacheToGPU(cacheData *TritonCacheData, acc accelerator.Acceler
 		}
 	}
 
+	var hasMatch bool
+	var backendMismatch bool
+
 	for _, gpuInfo := range devInfo {
-		gpuArch, err := strconv.Atoi(gpuInfo.Arch) // Convert GPU Arch string to int
-		if err != nil {
-			return fmt.Errorf("invalid GPU Arch format: %s", gpuInfo.Arch)
+		backendMatches := cacheData.Target.Backend == gpuInfo.Backend
+		archMatches := cacheData.Target.Arch.String() == gpuInfo.Arch
+		warpMatches := cacheData.Target.WarpSize == gpuInfo.WarpSize
+		ptxMatches := true
+
+		if gpuInfo.Backend == "cuda" && cacheData.PtxVersion != nil {
+			ptxMatches = *cacheData.PtxVersion == gpuInfo.PTXVersion
+			if !ptxMatches {
+				logging.Debugf("PTX version mismatch - cache=%d, gpu=%d", *cacheData.PtxVersion, gpuInfo.PTXVersion)
+			}
 		}
 
-		if cacheData.Target.Arch != gpuArch {
-			return fmt.Errorf("mismatch in architecture: cache=%d, gpu=%d", cacheData.Target.Arch, gpuArch)
+		if backendMatches && archMatches && warpMatches && ptxMatches {
+			hasMatch = true
+			break // No need to check further, at least one match is found
 		}
 
-		if cacheData.Target.WarpSize != gpuInfo.WarpSize {
-			return fmt.Errorf("mismatch in warp size: cache=%d, gpu=%d", cacheData.Target.WarpSize, gpuInfo.WarpSize)
-		}
-
-		if cacheData.PtxVersion != nil && *cacheData.PtxVersion != gpuInfo.PTXVersion {
-			return fmt.Errorf("mismatch in PTX version: cache=%d, gpu=%d", *cacheData.PtxVersion, gpuInfo.PTXVersion)
+		if !backendMatches {
+			backendMismatch = true
+			logging.Debugf("Backend mismatch - cache=%s, gpu=%s", cacheData.Target.Backend, gpuInfo.Backend)
 		}
 	}
 
-	return nil
+	if hasMatch {
+		return nil // At least one GPU matches all fields, return no error
+	}
+
+	if backendMismatch {
+		return fmt.Errorf("incompatibility detected: backendMismatch=%t", backendMismatch)
+	}
+
+	return fmt.Errorf("no compatible GPU found")
 }
