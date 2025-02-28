@@ -13,7 +13,7 @@ import (
 	"github.com/containers/podman/v5/pkg/bindings/images"
 	v1 "github.com/google/go-containerregistry/pkg/v1"
 	"github.com/gpuman/thunderbolt/pkg/constants"
-	"k8s.io/klog/v2"
+	logging "github.com/sirupsen/logrus"
 )
 
 type podmanFetcher struct{}
@@ -23,21 +23,21 @@ func (p *podmanFetcher) FetchImg(imgName string) (v1.Image, error) {
 	if socket == "" {
 		return nil, fmt.Errorf("failed to retrieve Podman socket for client")
 	}
-	klog.V(4).Info("Initialize Podman client")
+	logging.Info("Initialize Podman client")
 
 	ctx, err := bindings.NewConnection(context.Background(), socket)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create Podman client: %w", err)
 	}
 
-	klog.V(4).Info("Check if the image exists")
+	logging.Info("Check if the image exists")
 	options := images.ExistsOptions{}
 	_, err = images.Exists(ctx, imgName, &options)
 	if err != nil {
 		return nil, fmt.Errorf("failed to retrieve Podman images: %w", err)
 	}
 
-	klog.V(4).Info("found the image")
+	logging.Info("found the image")
 
 	tmpDir, err := os.MkdirTemp("", constants.PodmanCacheDirPrefix)
 	if err != nil {
@@ -60,7 +60,7 @@ func (p *podmanFetcher) FetchImg(imgName string) (v1.Image, error) {
 		return nil, fmt.Errorf("failed to export image: %v", err)
 	}
 
-	klog.V(4).Infof("Saved image: %s\n", tarballFile.Name())
+	logging.Infof("Saved image: %s\n", tarballFile.Name())
 	return loadImageFromTarball(tarballFilePath)
 
 }
@@ -72,7 +72,7 @@ func getPodmanSock() string {
 	// Check if the default rootful socket exists
 	if _, err := os.Stat(defaultSock); err == nil {
 		// If it exists, return the correct socket syntax
-		klog.V(4).Infof("Podman socket %s", defaultSock)
+		logging.Infof("Podman socket %s", defaultSock)
 		return "unix://" + defaultSock
 	}
 
@@ -85,7 +85,7 @@ func getPodmanSock() string {
 	// Construct rootless Podman socket path using the current user's UID
 	homeSock := fmt.Sprintf("/run/user/%s/podman/podman.sock", usr.Uid)
 	if _, err := os.Stat(homeSock); err == nil {
-		klog.V(4).Infof("Podman socket %s", homeSock)
+		logging.Infof("Podman socket %s", homeSock)
 		return "unix://" + homeSock
 	}
 
@@ -101,7 +101,7 @@ func getPodmanSock() string {
 	socketPath := strings.TrimSpace(string(output))
 
 	if socketPath != "" {
-		klog.V(4).Infof("Podman socket %s", socketPath)
+		logging.Infof("Podman socket %s", socketPath)
 		return "unix://" + socketPath
 	}
 

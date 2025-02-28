@@ -30,17 +30,22 @@ import (
 	v1 "github.com/google/go-containerregistry/pkg/v1"
 	"github.com/google/go-containerregistry/pkg/v1/tarball"
 	"github.com/google/go-containerregistry/pkg/v1/types"
+	"github.com/gpuman/thunderbolt/pkg/accelerator"
+	"github.com/gpuman/thunderbolt/pkg/config"
 	"github.com/gpuman/thunderbolt/pkg/constants"
+	"github.com/gpuman/thunderbolt/pkg/preflightcheck"
 	"github.com/gpuman/thunderbolt/pkg/utils"
 	"github.com/hashicorp/go-multierror"
-	"k8s.io/klog/v2"
+	logging "github.com/sirupsen/logrus"
 )
 
 // A quick list of TODOS:
 // 1. Add image caching to avoid the overhead of pulling the images down every time
 // 2. Don't create directories/files in $HOME/.triton/cache if they already exist.
 
-type tritonCacheExtractor struct{}
+type tritonCacheExtractor struct {
+	acc accelerator.Accelerator
+}
 
 type imgMgr struct {
 	fetcher   ImgFetcher
@@ -59,9 +64,23 @@ type ImgMgr interface {
 
 // Factory function to create a new ImgMgr.
 func New() ImgMgr {
+	var a accelerator.Accelerator
+
+	if config.IsGPUEnabled() {
+		r := accelerator.GetRegistry()
+		acc, err := accelerator.New(config.GPU, true)
+		if err != nil {
+			logging.Errorf("failed to init GPU accelerators: %v", err)
+		} else {
+			r.MustRegister(acc) // Register the accelerator with the registry
+			a = acc
+		}
+		// defer accelerator.Shutdown() // TODO CALL IN CLEANUP
+	}
+
 	return &imgMgr{
 		fetcher:   NewImgFetcher(),
-		extractor: &tritonCacheExtractor{},
+		extractor: &tritonCacheExtractor{acc: a},
 	}
 }
 
@@ -92,7 +111,7 @@ func loadImageFromTarball(path string) (v1.Image, error) {
 	if err != nil {
 		return nil, fmt.Errorf("failed to load image from tarball: %w", err)
 	}
-	klog.V(4).Info("loaded image from tarball!!!!!!!!")
+	logging.Debug("loaded image from tarball!!!!!!!!")
 	return img, nil
 }
 
@@ -104,7 +123,7 @@ func NewImgFetcher() ImgFetcher {
 func (i *imgFetcher) FetchImg(imgName string) (v1.Image, error) {
 
 	if i.fetcher == nil {
-		klog.V(4).Info("Error with fetcher!!!!!!!!")
+		logging.Error("Error with fetcher!!!!!!!!")
 		return nil, fmt.Errorf("failed to configure fetcher")
 	}
 
@@ -112,19 +131,19 @@ func (i *imgFetcher) FetchImg(imgName string) (v1.Image, error) {
 	if err != nil {
 		return nil, fmt.Errorf("failed to fetch image: %w", err)
 	}
-	klog.V(4).Info("Img retrieved successfully!!!!!!!!")
+	logging.Debug("Img retrieved successfully!!!!!!!!")
 
 	digest, err := img.Digest()
 	if err != nil {
 		return nil, fmt.Errorf("failed to get image digest: %w", err)
 	}
-	klog.V(4).Info("Img Digest:", digest)
+	logging.Debugf("Img Digest: %s", digest)
 
 	size, err := img.Size()
 	if err != nil {
 		return nil, fmt.Errorf("failed to get image digest: %w", err)
 	}
-	klog.V(4).Infof("Img Size: %v\n", size)
+	logging.Debugf("Img Size: %v\n", size)
 
 	// err = saveImageLocally(cachedImagePath, img, ref)
 	// if err != nil {
@@ -144,25 +163,35 @@ func (e *tritonCacheExtractor) ExtractCache(img v1.Image) error {
 		// This case, assume we have docker images with "application/vnd.docker.distribution.manifest.v2+json"
 		// as the manifest media type. Note that the media type of manifest is Docker specific and
 		// all OCI images would have an empty string in .MediaType field.
-		_, err := extractDockerImg(img)
-		if err != nil {
+		data, ret := extractDockerImg(img)
+		if ret != nil {
 			return fmt.Errorf("could not extract the Triton Cache from the container image %v", err)
 		}
 		utils.CleanupTmpDirs()
+
+		if ret := preflightcheck.CompareTritonCacheToGPU(data, e.acc); ret != nil {
+			return fmt.Errorf("***** the gpu and triton cache are incompatible ****")
+		}
 		return nil
 	}
 
 	// We try to parse it as the "compat" variant image with a single "application/vnd.oci.image.layer.v1.tar+gzip" layer.
-	_, errCompat := extractOCIStandardImg(img)
+	data, errCompat := extractOCIStandardImg(img)
 	if errCompat == nil {
 		utils.CleanupTmpDirs()
+		if ret := preflightcheck.CompareTritonCacheToGPU(data, e.acc); ret != nil {
+			return fmt.Errorf("***** the GPU and Triton cache are incompatible ****")
+		}
 		return nil
 	}
 
 	// Otherwise, we try to parse it as the *oci* variant image with custom artifact media types.
-	_, errOCI := extractOCIArtifactImg(img)
+	data, errOCI := extractOCIArtifactImg(img)
 	if errOCI == nil {
 		utils.CleanupTmpDirs()
+		if err = preflightcheck.CompareTritonCacheToGPU(data, e.acc); err != nil {
+			return fmt.Errorf("***** the gpu and triton cache are incompatible ****")
+		}
 		return nil
 	}
 	utils.CleanupTmpDirs()
@@ -192,7 +221,7 @@ func (i *imgMgr) FetchAndExtractCache(imgName string) error {
 
 // extractOCIArtifactImg extracts the triton cache from the
 // *oci* variant Triton Kernel Cache image:  //TODO ADD URL
-func extractOCIArtifactImg(img v1.Image) ([]byte, error) {
+func extractOCIArtifactImg(img v1.Image) (*preflightcheck.TritonCacheData, error) {
 	layers, err := img.Layers()
 	if err != nil {
 		return nil, fmt.Errorf("could not fetch layers: %v", err)
@@ -224,8 +253,8 @@ func extractOCIArtifactImg(img v1.Image) ([]byte, error) {
 	}
 
 	// Somehow go-container registry recognizes custom artifact layers as compressed ones,
-	// while the Solo's Wasm layer is actually uncompressed and therefore
-	// the content itself is a raw Wasm binary. So using "Uncompressed()" here result in errors
+	// while the GPU Kernel Cache/Binary layer is actually uncompressed and therefore
+	// the content itself is a GPU Kernel Cache/Binary. So using "Uncompressed()" here result in errors
 	// since internally it tries to umcompress it as gzipped blob.
 	r, err := layer.Compressed()
 	if err != nil {
@@ -233,18 +262,18 @@ func extractOCIArtifactImg(img v1.Image) ([]byte, error) {
 	}
 	defer r.Close()
 
-	// Just read it since the content is already a raw Wasm binary as mentioned above.
-	ret, err := io.ReadAll(r)
+	data, err := extractTritonCacheDirectory(r)
 	if err != nil {
-		return nil, fmt.Errorf("could not extract io.triton.cache: %v", err)
+		return nil, fmt.Errorf("could not extract Triton Kernel Cache: %v", err)
 	}
-	return ret, nil
+	return data, nil
 }
 
 // extractDockerImg extracts the Triton Kernel Cache from the
-// *compat* variant Wasm image with the standard Docker media type: application/vnd.docker.image.rootfs.diff.tar.gzip.
+// *compat* variant GPU Kernel Cache/Binary image with the standard Docker
+// media type: application/vnd.docker.image.rootfs.diff.tar.gzip.
 // https://github.com/maryamtahhan/thunderbolt/blob/main/spec-compat.md
-func extractDockerImg(img v1.Image) ([]byte, error) {
+func extractDockerImg(img v1.Image) (*preflightcheck.TritonCacheData, error) {
 	layers, err := img.Layers()
 	if err != nil {
 		return nil, fmt.Errorf("could not fetch layers: %v", err)
@@ -272,17 +301,17 @@ func extractDockerImg(img v1.Image) ([]byte, error) {
 	}
 	defer r.Close()
 
-	ret, err := extractTritonCacheDirectory(r)
+	data, err := extractTritonCacheDirectory(r)
 	if err != nil {
 		return nil, fmt.Errorf("could not extract Triton Kernel Cache: %v", err)
 	}
-	return ret, nil
+	return data, nil
 }
 
 // extractOCIStandardImg extracts the Triton Kernel Cache from the
 // *compat* variant Triton Kernel image with the standard OCI media type: application/vnd.oci.image.layer.v1.tar+gzip.
 // https://github.com/maryamtahhan/thunderbolt/blob/main/spec-compat.md
-func extractOCIStandardImg(img v1.Image) ([]byte, error) {
+func extractOCIStandardImg(img v1.Image) (*preflightcheck.TritonCacheData, error) {
 	layers, err := img.Layers()
 	if err != nil {
 		return nil, fmt.Errorf("could not fetch layers: %v", err)
@@ -310,23 +339,25 @@ func extractOCIStandardImg(img v1.Image) ([]byte, error) {
 	}
 	defer r.Close()
 
-	ret, err := extractTritonCacheDirectory(r)
+	data, err := extractTritonCacheDirectory(r)
 	if err != nil {
 		return nil, fmt.Errorf("could not extract Triton Kernel Cache: %v", err)
 	}
-	return ret, nil
+	return data, nil
 }
 
 // Extracts the triton named "io.triton.cache" in a given reader for tar.gz.
 // This is only used for *compat* variant.
-func extractTritonCacheDirectory(r io.Reader) ([]byte, error) {
+// TODO add preflight checks here.
+func extractTritonCacheDirectory(r io.Reader) (*preflightcheck.TritonCacheData, error) {
+	var data *preflightcheck.TritonCacheData
 	gr, err := gzip.NewReader(r)
 	if err != nil {
 		return nil, fmt.Errorf("failed to parse layer as tar.gz: %v", err)
 	}
 
-	// Tar reader to iterate through the archive
 	tr := tar.NewReader(gr)
+	// var cacheDirs []string  TODO RE-ENABLE
 
 	for {
 		h, err := tr.Next()
@@ -336,41 +367,48 @@ func extractTritonCacheDirectory(r io.Reader) ([]byte, error) {
 			return nil, fmt.Errorf("error reading tar archive: %w", err)
 		}
 
-		// Skip directories and files that are not part of io.triton.cache
+		// Skip files not in the Triton cache directory
 		if !strings.HasPrefix(h.Name, constants.TritonCacheDirName) {
 			continue
 		}
 
-		// Strip the prefix "io.triton.cache/" from the file path
+		// Track Triton cache directories
 		relativePath := strings.TrimPrefix(h.Name, constants.TritonCacheDirName)
 		if relativePath == "" {
-			continue // Skip the directory itself
+			// cacheDirs = append(cacheDirs, h.Name) // Store the directory name TODO RE-ENABLE
+			continue
 		}
 
-		// Resolve the new file path under the target directory
 		filePath := filepath.Join(constants.TritonCacheDir, relativePath)
 
 		switch h.Typeflag {
 		case tar.TypeDir:
-			// Create the directory in the target location
 			if err := os.MkdirAll(filePath, os.FileMode(h.Mode)); err != nil {
 				return nil, fmt.Errorf("failed to create directory %s: %w", filePath, err)
 			}
+			// cacheDirs = append(cacheDirs, filePath) // Store created directory TODO RE-ENABLE
 
 		case tar.TypeReg:
-			// Create the file in the target location
-			err := writeFile(filePath, tr, os.FileMode(h.Mode))
-			if err != nil {
+			if err := writeFile(filePath, tr, os.FileMode(h.Mode)); err != nil {
 				return nil, fmt.Errorf("failed to create file %s: %w", filePath, err)
 			}
 
+			// If the extracted file is a JSON, check it immediately
+			if strings.HasSuffix(filePath, ".json") {
+				d, err := preflightcheck.GetTritonCacheJSONData(filePath)
+				if err != nil {
+					// TODO CLEAN UP on failure
+					return nil, fmt.Errorf("failed preflight check on %s: %w", filePath, err)
+				}
+				data = d
+			}
+
 		default:
-			// Skip unsupported types
-			fmt.Printf("Skipping unsupported type: %c in file %s\n", h.Typeflag, h.Name)
+			logging.Debugf("Skipping unsupported type: %c in file %s\n", h.Typeflag, h.Name)
 		}
 	}
 
-	return nil, nil
+	return data, nil
 }
 
 // writeFile writes a file's content to disk from the tar reader

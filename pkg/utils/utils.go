@@ -7,7 +7,7 @@ import (
 	"os/exec"
 
 	"github.com/gpuman/thunderbolt/pkg/constants"
-	"k8s.io/klog/v2"
+	logging "github.com/sirupsen/logrus"
 )
 
 func FilePathExists(path string) (bool, error) {
@@ -53,6 +53,6 @@ func CleanupTmpDirs() error {
 		}
 	}
 
-	klog.V(4).Info("Temporary directories successfully deleted.")
+	logging.Info("Temporary directories successfully deleted.")
 	return nil
 }

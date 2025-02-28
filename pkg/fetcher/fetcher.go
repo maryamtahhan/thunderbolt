@@ -5,7 +5,7 @@ import (
 
 	v1 "github.com/google/go-containerregistry/pkg/v1"
 	"github.com/gpuman/thunderbolt/pkg/utils"
-	"k8s.io/klog/v2"
+	logging "github.com/sirupsen/logrus"
 )
 
 type Fetcher interface {
@@ -34,16 +34,16 @@ func NewFetcher() Fetcher {
 func (f *fetcher) FetchImg(imgName string) (v1.Image, error) {
 	// Try to fetch locally first
 	for _, localFetcher := range f.local {
-		klog.V(4).Infof("Trying local fetcher: %T", localFetcher)
+		logging.Infof("Trying local fetcher: %T", localFetcher)
 
 		img, _ := localFetcher.FetchImg(imgName)
 		if img != nil {
-			klog.Infof("Image found locally using %T", localFetcher)
+			logging.Infof("Image found locally using %T", localFetcher)
 			return img, nil
 		}
 
 		// If error or image is nil, log and continue to the next fetcher
-		klog.V(4).Infof("Failed to fetch image locally using %T:", localFetcher)
+		logging.Infof("Failed to fetch image locally using %T:", localFetcher)
 	}
 
 	// If local fetch fails, try fetching the image remotely
