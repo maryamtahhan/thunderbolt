@@ -95,14 +95,14 @@ func main() {
 		Run: func(cmd *cobra.Command, args []string) {
 			if createFlag {
 				if err := createCacheImage(imageName, cacheDirName); err != nil {
-					logging.Fatalf("Error creating image: %v\n", err)
+					logging.Errorf("Error creating image: %v\n", err)
 					os.Exit(exitCreateError)
 				}
 			}
 
 			if extractFlag {
 				if err := getCacheImage(imageName); err != nil {
-					logging.Fatalf("Error extracting image: %v\n", err)
+					logging.Errorf("Error extracting image: %v\n", err)
 					os.Exit(exitExtractError)
 				}
 			}
