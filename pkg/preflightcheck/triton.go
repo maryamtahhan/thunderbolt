@@ -4,8 +4,12 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"log"
 	"os"
+	"path/filepath"
+	"strconv"
 
+	v1 "github.com/google/go-containerregistry/pkg/v1"
 	"github.com/gpuman/thunderbolt/pkg/accelerator"
 	"github.com/gpuman/thunderbolt/pkg/accelerator/devices"
 	"github.com/gpuman/thunderbolt/pkg/config"
@@ -37,6 +41,14 @@ type TritonCacheData struct {
 	GlobalScratchSize         int        `json:"global_scratch_size"`
 	GlobalScratchAlign        int        `json:"global_scratch_align"`
 	Name                      string     `json:"name"`
+}
+
+type TritonImageData struct {
+	Hash       string
+	Backend    string
+	Arch       string
+	WarpSize   int
+	PtxVersion int
 }
 
 // Nested struct for the "target" field
@@ -132,4 +144,157 @@ func CompareTritonCacheToGPU(cacheData *TritonCacheData, acc accelerator.Acceler
 	}
 
 	return fmt.Errorf("no compatible GPU found")
+}
+
+func CompareTritonCacheImageToGPU(img v1.Image, acc accelerator.Accelerator) error {
+	if img == nil {
+		return errors.New("cache data is nil")
+	}
+	if acc == nil {
+		return errors.New("acc is nil")
+	}
+
+	// Get the image's config file
+	configFile, err := img.ConfigFile()
+	if err != nil {
+		return fmt.Errorf("failed to get image config: %v", err)
+	}
+
+	// Extract labels
+	labels := configFile.Config.Labels
+
+	warpSize, err := strconv.Atoi(labels["cache.triton.image/warp-size"])
+	if err != nil {
+		logging.Errorf("Failed to parse warp size: %v", err)
+		return fmt.Errorf("failed to parse warp size: %v", err)
+	}
+
+	imgData := TritonImageData{
+		Hash:     labels["cache.triton.image/hash"],
+		Backend:  labels["cache.triton.image/hash"],
+		Arch:     labels["cache.triton.image/hash"],
+		WarpSize: warpSize,
+	}
+
+	if ptx, ok := labels["cache.triton.image/ptx-version"]; ok {
+		p, err := strconv.Atoi(ptx)
+		if err == nil {
+			imgData.PtxVersion = p
+		}
+	}
+
+	var devInfo []devices.TritonGPUInfo
+	if config.IsGPUEnabled() {
+		if gpu := accelerator.GetActiveAcceleratorByType(config.GPU); gpu != nil {
+			d := gpu.Device()
+			if tritonDevInfo, err := d.GetAllGPUInfo(); err == nil {
+				devInfo = tritonDevInfo
+			} else {
+				return errors.New("couldn't retrieve the GPU Triton info")
+			}
+		}
+	}
+
+	var hasMatch bool
+	var backendMismatch bool
+
+	for _, gpuInfo := range devInfo {
+		backendMatches := imgData.Backend == gpuInfo.Backend
+		archMatches := imgData.Arch == gpuInfo.Arch
+		warpMatches := imgData.WarpSize == gpuInfo.WarpSize
+		ptxMatches := true
+
+		if gpuInfo.Backend == "cuda" && imgData.PtxVersion != 0 {
+			ptxMatches = imgData.PtxVersion == gpuInfo.PTXVersion
+			if !ptxMatches {
+				logging.Debugf("PTX version mismatch - cache=%d, gpu=%d", imgData.PtxVersion, gpuInfo.PTXVersion)
+			}
+		}
+
+		if backendMatches && archMatches && warpMatches && ptxMatches {
+			hasMatch = true
+			break // No need to check further, at least one match is found
+		}
+
+		if !backendMatches {
+			backendMismatch = true
+			logging.Debugf("Backend mismatch - cache=%s, gpu=%s", imgData.Backend, gpuInfo.Backend)
+		}
+	}
+
+	if hasMatch {
+		return nil // At least one GPU matches all fields, return no error
+	}
+
+	if backendMismatch {
+		return fmt.Errorf("incompatibility detected: backendMismatch=%t", backendMismatch)
+	}
+
+	return fmt.Errorf("no compatible GPU found")
+}
+
+// checkFirstKeyHash checks if the first key in the JSON file is "Hash": "hashvalue"
+func checkFirstKeyHash(filePath string) (bool, error) {
+	logging.Debugf("checkFirstKeyHash:%v", filePath)
+
+	// Read the JSON file
+	data, err := os.ReadFile(filePath)
+	if err != nil {
+		return false, err
+	}
+
+	// Unmarshal into a generic map
+	var jsonData TritonCacheData
+	if err := json.Unmarshal(data, &jsonData); err != nil {
+		return false, err
+	}
+
+	// Check if the "hash" field is present and valid
+	if jsonData.Hash == "" {
+		// DO NOT return an error.
+		return false, nil
+	}
+
+	return true, nil
+}
+
+// FindTritonCacheJSON searches for JSON files in a directory and subdirectories
+func FindTritonCacheJSON(rootDir string) (string, error) {
+	var foundFile string
+
+	// Walk through the directory
+	err := filepath.Walk(rootDir, func(path string, info os.FileInfo, err error) error {
+		if err != nil {
+			return err
+		}
+
+		logging.Debugf("filepath:%v", info.Name())
+		// Check if the file has a .json extension
+		if !info.IsDir() && filepath.Ext(path) == ".json" {
+			logging.Debugf("GOT A JSON FILE:%v", info.Name())
+
+			match, err := checkFirstKeyHash(path)
+			if err != nil {
+				log.Printf("Error checking file %s: %v\n", path, err)
+				return nil
+			}
+
+			if match {
+				foundFile = path
+				return filepath.SkipDir // Stop searching once found
+			}
+		}
+
+		return nil
+	})
+
+	if err != nil {
+		return "", err
+	}
+
+	if foundFile == "" {
+		return "", fmt.Errorf("no matching Triton cache JSON found")
+	}
+
+	return foundFile, nil
 }

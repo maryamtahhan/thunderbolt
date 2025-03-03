@@ -5,12 +5,14 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
+	"strconv"
 
 	"github.com/containers/buildah"
 	"github.com/containers/common/pkg/config"
 	is "github.com/containers/image/v5/storage"
 	"github.com/containers/storage"
 	"github.com/gpuman/thunderbolt/pkg/constants"
+	"github.com/gpuman/thunderbolt/pkg/preflightcheck"
 	"github.com/gpuman/thunderbolt/pkg/utils"
 	logging "github.com/sirupsen/logrus"
 )
@@ -24,6 +26,16 @@ func (b *buildahBuilder) CreateImage(imageName, cacheDir string) error {
 		return err
 	}
 	defer os.RemoveAll(tmpDir)
+	json, err := preflightcheck.FindTritonCacheJSON(cacheDir)
+	if err != nil {
+		// TODO CLEAN UP on failure
+		return fmt.Errorf("failed to retrieve cache json file from %s: %w", cacheDir, err)
+	}
+	data, err := preflightcheck.GetTritonCacheJSONData(json)
+	if err != nil {
+		// TODO CLEAN UP on failure
+		return fmt.Errorf("failed to retrieve cache data %s: %w", cacheDir, err)
+	}
 	err = copyDir(cacheDir, tmpDir)
 	if err != nil {
 		return fmt.Errorf("error copying contents using cp: %v", err)
@@ -47,7 +59,9 @@ func (b *buildahBuilder) CreateImage(imageName, cacheDir string) error {
 	}
 	defer buildStore.Shutdown(false)
 
-	imageRef, err := is.Transport.ParseStoreReference(buildStore, imageName)
+	imageWithTag := fmt.Sprintf("%s:%s", imageName, data.Hash)
+
+	imageRef, err := is.Transport.ParseStoreReference(buildStore, imageWithTag)
 	if err != nil {
 		return fmt.Errorf("error creating the image reference: %v", err)
 	}
@@ -65,7 +79,14 @@ func (b *buildahBuilder) CreateImage(imageName, cacheDir string) error {
 	}
 	defer builder.Delete()
 
-	builder.SetAnnotation("module.triton.image/variant", "compat")
+	builder.SetLabel("cache.triton.image/variant", "compat")
+	builder.SetLabel("cache.triton.image/hash", data.Hash)
+	builder.SetLabel("cache.triton.image/arch", string(data.Target.Arch))
+	builder.SetLabel("cache.triton.image/backend", data.Target.Backend)
+	builder.SetLabel("cache.triton.image/warp-size", strconv.Itoa(data.Target.WarpSize))
+	if data.PtxVersion != nil && *data.PtxVersion != 0 {
+		builder.SetLabel("cache.triton.image/ptx-version", strconv.Itoa(*data.PtxVersion))
+	}
 
 	addOptions := buildah.AddAndCopyOptions{}
 	err = builder.Add("", false, addOptions, tmpDir)
