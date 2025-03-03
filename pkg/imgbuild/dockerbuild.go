@@ -20,10 +20,12 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"strconv"
 
 	"github.com/docker/docker/api/types"
 	"github.com/docker/docker/client"
 	"github.com/docker/docker/pkg/archive"
+	"github.com/gpuman/thunderbolt/pkg/preflightcheck"
 	"github.com/gpuman/thunderbolt/pkg/utils"
 	logging "github.com/sirupsen/logrus"
 )
@@ -35,7 +37,18 @@ func (d *dockerBuilder) CreateImage(imageName, cacheDir string) error {
 	wd, _ := os.Getwd()
 	dockerfilePath := fmt.Sprintf("%s/Dockerfile", wd)
 
-	err := generateDockerfile(imageName, cacheDir, dockerfilePath)
+	json, err := preflightcheck.FindTritonCacheJSON(cacheDir)
+	if err != nil {
+		// TODO CLEAN UP on failure
+		return fmt.Errorf("failed to retrieve cache json file from %s: %w", cacheDir, err)
+	}
+	jsondata, err := preflightcheck.GetTritonCacheJSONData(json)
+	if err != nil {
+		// TODO CLEAN UP on failure
+		return fmt.Errorf("failed to retrieve cache data %s: %w", cacheDir, err)
+	}
+
+	err = generateDockerfile(imageName, cacheDir, dockerfilePath)
 	if err != nil {
 		return fmt.Errorf("failed to generate Dockerfile: %w", err)
 	}
@@ -55,11 +68,24 @@ func (d *dockerBuilder) CreateImage(imageName, cacheDir string) error {
 	}
 	defer tar.Close()
 
+	labels := map[string]string{
+		"cache.triton.image/variant":   "compat",
+		"cache.triton.image/hash":      jsondata.Hash,
+		"cache.triton.image/arch":      string(jsondata.Target.Arch),
+		"cache.triton.image/backend":   jsondata.BackendName,
+		"cache.triton.image/warp-size": strconv.Itoa(jsondata.Target.WarpSize),
+	}
+
+	if jsondata.PtxVersion != nil && *jsondata.PtxVersion != 0 {
+		labels["cache.triton.image/ptx-version"] = strconv.Itoa(*jsondata.PtxVersion)
+	}
+
 	buildOptions := types.ImageBuildOptions{
 		Dockerfile: "Dockerfile",
 		Tags:       []string{imageName},
 		NoCache:    true,
 		Remove:     false,
+		Labels:     labels,
 	}
 
 	buildResponse, err := apiClient.ImageBuild(context.Background(), tar, buildOptions)
@@ -73,7 +99,8 @@ func (d *dockerBuilder) CreateImage(imageName, cacheDir string) error {
 		return fmt.Errorf("error reading build output: %w", err)
 	}
 
-	err = apiClient.ImageTag(context.Background(), imageName, imageName+":latest")
+	imageWithTag := fmt.Sprintf("%s:%s", imageName, jsondata.Hash)
+	err = apiClient.ImageTag(context.Background(), imageName, imageWithTag)
 	if err != nil {
 		return fmt.Errorf("error tagging image: %w", err)
 	}

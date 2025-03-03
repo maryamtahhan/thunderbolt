@@ -22,6 +22,7 @@ import (
 
 	"github.com/containers/buildah"
 	"github.com/containers/storage/pkg/unshare"
+	"github.com/gpuman/thunderbolt/pkg/config"
 	"github.com/gpuman/thunderbolt/pkg/fetcher"
 	"github.com/gpuman/thunderbolt/pkg/imgbuild"
 	"github.com/gpuman/thunderbolt/pkg/logformat"
@@ -73,6 +74,13 @@ func main() {
 	logging.SetReportCaller(true)
 	logging.SetFormatter(logformat.Default)
 
+	// Initialize the config
+	_, err := config.Initialize(config.ConfDir)
+	if err != nil {
+		logging.Fatalf("Error initializing config: %v\n", err)
+		os.Exit(exitLogError)
+	}
+
 	var rootCmd = &cobra.Command{
 		Use:   "thunderbolt",
 		Short: "A GPU Kernel runtime container image management utility",
@@ -87,14 +95,14 @@ func main() {
 		Run: func(cmd *cobra.Command, args []string) {
 			if createFlag {
 				if err := createCacheImage(imageName, cacheDirName); err != nil {
-					logging.Fatalf("Error creating image: %v\n", err)
+					logging.Errorf("Error creating image: %v\n", err)
 					os.Exit(exitCreateError)
 				}
 			}
 
 			if extractFlag {
 				if err := getCacheImage(imageName); err != nil {
-					logging.Fatalf("Error extracting image: %v\n", err)
+					logging.Errorf("Error extracting image: %v\n", err)
 					os.Exit(exitExtractError)
 				}
 			}
@@ -121,6 +129,8 @@ func main() {
 		return
 	}
 	unshare.MaybeReexecUsingUserNamespace(false)
+
+	config.SetEnabledGPU(true) // ASSUME TRUE FOR NOW
 
 	// Execute the Cobra command
 	if err := rootCmd.Execute(); err != nil {
