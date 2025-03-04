@@ -15,11 +15,11 @@ import (
 const rocmHwType = config.GPU
 
 var (
-	rocmAccImpl = gpuRocm{}
+	rocmAccImpl = gpuROCm{}
 	rocmType    DeviceType
 )
 
-type gpuRocm struct {
+type gpuROCm struct {
 	devices map[int]GPUDevice // GPU identifiers mapped to device info
 }
 
@@ -56,12 +56,12 @@ type ROCMSystemInfo struct {
 
 func rocmCheck(r *Registry) {
 	if err := initROCmLib(); err != nil {
-		logging.Infof("Error initializing ROCm: %v", err)
+		logging.Debugf("Error initializing ROCm: %v", err)
 		return
 	}
 	rocmType = ROCM
 	if err := addDeviceInterface(r, rocmType, rocmHwType, rocmDeviceStartup); err == nil {
-		logging.Infof("Using %s to obtain processor power", rocmAccImpl.Name())
+		logging.Infof("Using %s to obtain GPU info", rocmAccImpl.Name())
 	} else {
 		logging.Infof("Error registering rocm-smi: %v", err)
 	}
@@ -88,25 +88,25 @@ func initROCmLib() error {
 	return errors.New("couldn't find rocm-smi")
 }
 
-func (r *gpuRocm) InitLib() error {
+func (r *gpuROCm) InitLib() error {
 	return initROCmLib()
 }
 
-func (r *gpuRocm) Name() string {
+func (r *gpuROCm) Name() string {
 	return rocmType.String()
 }
 
-func (r *gpuRocm) DevType() DeviceType {
+func (r *gpuROCm) DevType() DeviceType {
 	return rocmType
 }
 
-func (r *gpuRocm) HwType() string {
+func (r *gpuROCm) HwType() string {
 	return rocmHwType
 }
 
 // Init initializes and starts the GPU info collection using a **single `rocm-smi` command**
-func (r *gpuRocm) Init() error {
-	gpuInfoList, err := getAllRocmGPUInfo()
+func (r *gpuROCm) Init() error {
+	gpuInfoList, err := getAllROCmGPUInfo()
 	if err != nil {
 		return fmt.Errorf("failed to get GPU information: %v", err)
 	}
@@ -134,16 +134,16 @@ func (r *gpuRocm) Init() error {
 }
 
 // Shutdown stops the GPU metric collector
-func (r *gpuRocm) Shutdown() bool {
+func (r *gpuROCm) Shutdown() bool {
 	return true
 }
 
-func getAllRocmGPUInfo() (*ROCMGPUInfo, error) {
-	gpus, err := getRocmGPUInfo()
+func getAllROCmGPUInfo() (*ROCMGPUInfo, error) {
+	gpus, err := getROCmGPUInfo()
 	if err != nil {
 		return nil, fmt.Errorf("could not get GPU info")
 	}
-	system, err := getRocmSystemInfo()
+	system, err := getROCmSystemInfo()
 	if err != nil {
 		return nil, fmt.Errorf("could not get system info")
 	}
@@ -155,7 +155,7 @@ func getAllRocmGPUInfo() (*ROCMGPUInfo, error) {
 }
 
 // Fetches all GPUs' info in **one single rocm-smi call**
-func getRocmGPUInfo() (map[int]*ROCMCardInfo, error) {
+func getROCmGPUInfo() (map[int]*ROCMCardInfo, error) {
 	cmd := exec.Command("rocm-smi", "--json", "--showproductname", "--showuniqueid", "--showserial", "--showmeminfo", "all")
 	output, err := cmd.Output()
 	if err != nil {
@@ -188,7 +188,7 @@ func getRocmGPUInfo() (map[int]*ROCMCardInfo, error) {
 }
 
 // Fetches all GPUs' info in **one single rocm-smi call**
-func getRocmSystemInfo() (*ROCMSystemInfo, error) {
+func getROCmSystemInfo() (*ROCMSystemInfo, error) {
 	cmd := exec.Command("rocm-smi", "--json", "--showdriverversion")
 	output, err := cmd.Output()
 	if err != nil {
@@ -211,7 +211,7 @@ func getRocmSystemInfo() (*ROCMSystemInfo, error) {
 }
 
 // GetAllGPUInfo returns a list of GPU info for all devices
-func (r *gpuRocm) GetAllGPUInfo() ([]TritonGPUInfo, error) {
+func (r *gpuROCm) GetAllGPUInfo() ([]TritonGPUInfo, error) {
 	var allTritonInfo []TritonGPUInfo
 	for gpuID, dev := range r.devices {
 		allTritonInfo = append(allTritonInfo, dev.TritonInfo)
@@ -221,7 +221,7 @@ func (r *gpuRocm) GetAllGPUInfo() ([]TritonGPUInfo, error) {
 }
 
 // GetGPUInfo retrieves the stored GPU info for a specific device ID.
-func (r *gpuRocm) GetGPUInfo(gpuID int) (TritonGPUInfo, error) {
+func (r *gpuROCm) GetGPUInfo(gpuID int) (TritonGPUInfo, error) {
 	dev, exists := r.devices[gpuID]
 	if !exists {
 		return TritonGPUInfo{}, fmt.Errorf("GPU device %d not found", gpuID)

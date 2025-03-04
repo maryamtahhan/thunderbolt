@@ -26,6 +26,7 @@ import (
 
 const (
 	MOCK DeviceType = iota
+	AMD
 	NVML
 	ROCM
 )
@@ -44,7 +45,7 @@ type (
 )
 
 func (d DeviceType) String() string {
-	return [...]string{"MOCK", "NVML", "ROCM"}[d]
+	return [...]string{"MOCK", "AMD", "NVML", "ROCM"}[d]
 }
 
 type Device interface {
@@ -93,6 +94,7 @@ func SetRegistry(registry *Registry) {
 // Register all available devices in the global registry
 func registerDevices(r *Registry) {
 	// Call individual device check functions
+	amdCheck(r)
 	nvmlCheck(r)
 	rocmCheck(r)
 }
@@ -117,7 +119,7 @@ func (r *Registry) Unregister(d DeviceType) {
 			return
 		}
 	}
-	logging.Errorf("Device with type %s doesn't exist", d)
+	logging.Debugf("Device with type %s doesn't exist", d)
 }
 
 // GetAllDeviceTypes returns a slice with all the registered devices.
@@ -135,14 +137,24 @@ func addDeviceInterface(registry *Registry, dtype DeviceType, accType string, de
 			return errors.New("multiple Devices attempting to register with name")
 		}
 
-		logging.Infof("Try to Register %s", dtype)
+		if dtype == AMD {
+			// Remove "nvml" if "dcgm" is being registered
+			registry.Unregister(ROCM)
+		} else if dtype == ROCM {
+			// Do not register "nvml" if "dcgm" is already registered
+			if _, ok := registry.Registry[config.GPU][AMD]; ok {
+				return errors.New("AMD already registered. Skipping ROCM")
+			}
+		}
+
+		logging.Debugf("Try to Register %s", dtype)
 		registry.MustRegister(accType, dtype, deviceStartup)
 	default:
-		logging.Infof("Try to Register %s", dtype)
+		logging.Debugf("Try to Register %s", dtype)
 		registry.MustRegister(accType, dtype, deviceStartup)
 	}
 
-	logging.Infof("Registered %s", dtype)
+	logging.Debugf("Registered %s", dtype)
 
 	return nil
 }

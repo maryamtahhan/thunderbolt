@@ -171,8 +171,8 @@ func CompareTritonCacheImageToGPU(img v1.Image, acc accelerator.Accelerator) err
 
 	imgData := TritonImageData{
 		Hash:     labels["cache.triton.image/hash"],
-		Backend:  labels["cache.triton.image/hash"],
-		Arch:     labels["cache.triton.image/hash"],
+		Backend:  labels["cache.triton.image/backend"],
+		Arch:     labels["cache.triton.image/arch"],
 		WarpSize: warpSize,
 	}
 
