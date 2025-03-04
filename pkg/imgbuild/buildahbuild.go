@@ -81,7 +81,7 @@ func (b *buildahBuilder) CreateImage(imageName, cacheDir string) error {
 
 	builder.SetLabel("cache.triton.image/variant", "compat")
 	builder.SetLabel("cache.triton.image/hash", data.Hash)
-	builder.SetLabel("cache.triton.image/arch", string(data.Target.Arch))
+	builder.SetLabel("cache.triton.image/arch", preflightcheck.ConvertArchToString(data.Target.Arch))
 	builder.SetLabel("cache.triton.image/backend", data.Target.Backend)
 	builder.SetLabel("cache.triton.image/warp-size", strconv.Itoa(data.Target.WarpSize))
 	if data.PtxVersion != nil && *data.PtxVersion != 0 {
