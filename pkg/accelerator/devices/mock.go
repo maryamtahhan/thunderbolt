@@ -32,7 +32,7 @@ type MockDevice struct {
 func RegisterMockDevice() {
 	r := GetRegistry()
 	if err := addDeviceInterface(r, mockDevice, mockDevice.String(), MockDeviceDeviceStartup); err != nil {
-		logging.Errorf("couldn't register mock device %v", err)
+		logging.Debugf("couldn't register mock device %v", err)
 	}
 }
 

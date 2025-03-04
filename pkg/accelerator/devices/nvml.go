@@ -43,13 +43,13 @@ type gpuNvml struct {
 
 func nvmlCheck(r *Registry) {
 	if err := nvml.Init(); err != nvml.SUCCESS {
-		logging.Infof("Error initializing nvml: %v", nvmlErrorString(err))
+		logging.Debugf("Error initializing nvml: %v", nvmlErrorString(err))
 		return
 	}
 	logging.Info("Initializing nvml Successful")
 	nvmlType = NVML
 	if err := addDeviceInterface(r, nvmlType, nvmlHwType, nvmlDeviceStartup); err == nil {
-		logging.Infof("Using %s to obtain processor power", nvmlAccImpl.Name())
+		logging.Infof("Using %s to obtain GPU info", nvmlAccImpl.Name())
 	} else {
 		logging.Infof("Error registering nvml: %v", err)
 	}
@@ -58,7 +58,7 @@ func nvmlCheck(r *Registry) {
 func nvmlDeviceStartup() Device {
 	a := nvmlAccImpl
 	if err := a.InitLib(); err != nil {
-		logging.Errorf("Error initializing %s: %v", nvmlType.String(), err)
+		logging.Debugf("Error initializing %s: %v", nvmlType.String(), err)
 		return nil
 	}
 	if err := a.Init(); err != nil {
