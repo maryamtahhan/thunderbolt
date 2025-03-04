@@ -71,7 +71,7 @@ func (d *dockerBuilder) CreateImage(imageName, cacheDir string) error {
 	labels := map[string]string{
 		"cache.triton.image/variant":   "compat",
 		"cache.triton.image/hash":      jsondata.Hash,
-		"cache.triton.image/arch":      string(jsondata.Target.Arch),
+		"cache.triton.image/arch":      preflightcheck.ConvertArchToString(jsondata.Target.Arch),
 		"cache.triton.image/backend":   jsondata.BackendName,
 		"cache.triton.image/warp-size": strconv.Itoa(jsondata.Target.WarpSize),
 	}

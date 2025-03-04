@@ -53,9 +53,9 @@ type TritonImageData struct {
 
 // Nested struct for the "target" field
 type Target struct {
-	Backend  string      `json:"backend"`
-	Arch     json.Number `json:"arch"`
-	WarpSize int         `json:"warp_size"`
+	Backend  string `json:"backend"`
+	Arch     any    `json:"arch"`
+	WarpSize int    `json:"warp_size"`
 }
 
 func GetTritonCacheJSONData(filePath string) (*TritonCacheData, error) {
@@ -113,7 +113,7 @@ func CompareTritonCacheToGPU(cacheData *TritonCacheData, acc accelerator.Acceler
 
 	for _, gpuInfo := range devInfo {
 		backendMatches := cacheData.Target.Backend == gpuInfo.Backend
-		archMatches := cacheData.Target.Arch.String() == gpuInfo.Arch
+		archMatches := ConvertArchToString(cacheData.Target.Arch) == gpuInfo.Arch
 		warpMatches := cacheData.Target.WarpSize == gpuInfo.WarpSize
 		ptxMatches := true
 
@@ -297,4 +297,18 @@ func FindTritonCacheJSON(rootDir string) (string, error) {
 	}
 
 	return foundFile, nil
+}
+
+func ConvertArchToString(arch any) string {
+	switch v := arch.(type) {
+	case string:
+		return v // Already a string, return as is
+	case int:
+		return strconv.Itoa(v) // Convert int to string
+	case float64:
+		return fmt.Sprintf("%.0f", v) // Convert float64 to string
+	default:
+		logging.Errorf("Unexpected type for arch: %T", v)
+		return "" // Return an empty string for unexpected types
+	}
 }
