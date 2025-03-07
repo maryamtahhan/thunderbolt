@@ -42,10 +42,16 @@ func (d *dockerBuilder) CreateImage(imageName, cacheDir string) error {
 		// TODO CLEAN UP on failure
 		return fmt.Errorf("failed to retrieve cache json file from %s: %w", cacheDir, err)
 	}
+
 	jsondata, err := preflightcheck.GetTritonCacheJSONData(json)
 	if err != nil {
 		// TODO CLEAN UP on failure
 		return fmt.Errorf("failed to retrieve cache data %s: %w", cacheDir, err)
+	}
+
+	dummyKey, err := preflightcheck.ComputeDummyTritonKey()
+	if err != nil {
+		return fmt.Errorf("failed to calculate a dummy triton key: %w", err)
 	}
 
 	err = generateDockerfile(imageName, cacheDir, dockerfilePath)
@@ -74,6 +80,7 @@ func (d *dockerBuilder) CreateImage(imageName, cacheDir string) error {
 		"cache.triton.image/arch":      preflightcheck.ConvertArchToString(jsondata.Target.Arch),
 		"cache.triton.image/backend":   jsondata.BackendName,
 		"cache.triton.image/warp-size": strconv.Itoa(jsondata.Target.WarpSize),
+		"cache.triton.image/dummy-key": dummyKey,
 	}
 
 	if jsondata.PtxVersion != nil && *jsondata.PtxVersion != 0 {

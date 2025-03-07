@@ -69,6 +69,7 @@ func main() {
 	var cacheDirName string
 	var createFlag bool
 	var extractFlag bool
+	var baremetalFlag bool
 	var logLevel string
 
 	logging.SetReportCaller(true)
@@ -93,6 +94,8 @@ func main() {
 
 		},
 		Run: func(cmd *cobra.Command, args []string) {
+			config.SetEnabledBaremetal(baremetalFlag)
+			logging.Infof("baremetalFlag %v", baremetalFlag)
 			if createFlag {
 				if err := createCacheImage(imageName, cacheDirName); err != nil {
 					logging.Errorf("Error creating image: %v\n", err)
@@ -115,6 +118,7 @@ func main() {
 	}
 
 	// Define flags for Cobra
+	rootCmd.Flags().BoolVarP(&baremetalFlag, "baremetal", "b", false, "Run baremetal preflight checks")
 	rootCmd.Flags().StringVarP(&imageName, "image", "i", "", "OCI image name")
 	rootCmd.Flags().StringVarP(&cacheDirName, "dir", "d", "", "Triton Cache Directory")
 	rootCmd.Flags().BoolVarP(&createFlag, "create", "c", false, "Create OCI image")
