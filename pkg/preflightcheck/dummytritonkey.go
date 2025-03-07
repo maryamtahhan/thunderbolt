@@ -1,0 +1,182 @@
+package preflightcheck
+
+import (
+	"crypto/sha256"
+	"encoding/hex"
+	"encoding/json"
+	"fmt"
+	"os"
+	"os/exec"
+	"strings"
+
+	logging "github.com/sirupsen/logrus"
+)
+
+// getCacheInvalidatingEnvVars retrieves environment variables affecting cache using a Python Triton call.
+func getCacheInvalidatingEnvVars() (map[string]string, error) {
+	cmd := exec.Command("python3", "-c", `
+import json
+try:
+    from triton._C.libtriton import get_cache_invalidating_env_vars
+    print(json.dumps(get_cache_invalidating_env_vars(), sort_keys=True))
+except ImportError as e:
+    print(json.dumps({}, sort_keys=True))
+`)
+	output, err := cmd.Output()
+	if err != nil {
+		return nil, err
+	}
+
+	var envVars map[string]string
+	err = json.Unmarshal(output, &envVars)
+	if err != nil {
+		return nil, err
+	}
+
+	return envVars, nil
+}
+
+// getCurrentTarget retrieves the current target information from Triton.
+func getCurrentTarget() (string, error) {
+	cmd := exec.Command("python3", "-c", `
+import json
+try:
+    from triton.runtime.driver import driver
+    target = driver.active.get_current_target()
+    result = f"{target.backend}-{target.arch}-{target.warp_size}"
+    print(json.dumps(result))
+except Exception as e:
+    print(json.dumps("unknown-backend-0-0"))
+`)
+	output, err := cmd.Output()
+	if err != nil {
+		return "unknown-backend-0-0", err
+	}
+
+	var target string
+	err = json.Unmarshal(output, &target)
+	if err != nil {
+		return "unknown-backend-0-0", err
+	}
+
+	return target, nil
+}
+
+// getTritonInstallationKey retrieves the Triton installation fingerprint.
+func getTritonInstallationKey() (string, error) {
+	cmd := exec.Command("python3", "-c", `
+import json
+try:
+    import triton
+    key = triton.compiler.compiler.triton_key()
+    print(json.dumps(key, sort_keys=True))
+except Exception:
+    print(json.dumps("unknown-triton-key", sort_keys=True))
+`)
+	output, err := cmd.Output()
+	if err != nil {
+		return "unknown-triton-key", err
+	}
+
+	var key string
+	err = json.Unmarshal(output, &key)
+	if err != nil {
+		return "unknown-triton-key", err
+	}
+
+	return key, nil
+}
+
+func generateSHA256(input string) string {
+	hash := sha256.Sum256([]byte(input))
+	return hex.EncodeToString(hash[:])
+}
+
+// sortJSON ensures JSON objects have consistent key ordering before hashing.
+func sortJSON(input interface{}) string {
+	jsonBytes, err := json.Marshal(input)
+	if err != nil {
+		logging.Fatalf("Failed to serialize JSON: %v", err)
+	}
+	return string(jsonBytes)
+}
+
+type Components map[string]interface{}
+
+// generateTritonCacheKey generates the cache key and its components.
+func generateTritonCacheKey(sourceHash string) (string, Components, error) {
+	components := make(map[string]interface{})
+
+	tritonKey, err := getTritonInstallationKey()
+	if err != nil {
+		return "", nil, fmt.Errorf("failed to get Triton installation fingerprint: %v", err)
+	}
+	components["triton_key"] = tritonKey
+
+	if sourceHash == "" {
+		sourceHash = "dummy_source_content"
+	}
+	components["source"] = map[string]string{
+		"content": sourceHash,
+		"hash":    generateSHA256(sourceHash),
+	}
+
+	backendInfo, err := getCurrentTarget()
+	if err != nil {
+		return "", nil, fmt.Errorf("failed to get backend info: %v", err)
+	}
+	components["backend"] = map[string]string{
+		"info": backendInfo,
+		"hash": generateSHA256(backendInfo),
+	}
+
+	options := map[string]interface{}{
+		"num_warps":  4,
+		"num_stages": 3,
+		"debug":      os.Getenv("TRITON_DEBUG") == "1",
+	}
+	sortedOptions := sortJSON(options)
+	components["options"] = map[string]string{
+		"values": sortedOptions,
+		"hash":   generateSHA256(sortedOptions),
+	}
+
+	envVars, err := getCacheInvalidatingEnvVars()
+	if err != nil {
+		return "", nil, fmt.Errorf("failed to get environment variables: %v", err)
+	}
+	sortedEnvVars := sortJSON(envVars)
+	components["environment"] = map[string]string{
+		"variables": sortedEnvVars,
+		"hash":      generateSHA256(sortedEnvVars),
+	}
+
+	keyComponents := fmt.Sprintf("%s-%s-%s-%s-%s",
+		components["triton_key"],
+		components["source"].(map[string]string)["hash"],
+		components["backend"].(map[string]string)["hash"],
+		components["options"].(map[string]string)["hash"],
+		components["environment"].(map[string]string)["hash"],
+	)
+
+	components["final_composite"] = keyComponents
+	finalHash := generateSHA256(keyComponents)
+
+	return finalHash, components, nil
+}
+
+func ComputeDummyTritonKey() (string, error) {
+	logging.Debug("Generating Triton cache key...")
+	cacheKey, components, err := generateTritonCacheKey("")
+	if err != nil {
+		return "", fmt.Errorf("critical error during cache key generation: %v", err)
+	}
+
+	logging.Debug("\nCache Key Components Breakdown:")
+	logging.Debug(strings.Repeat("-", 40))
+	jsonComponents, _ := json.MarshalIndent(components, "", "  ")
+	logging.Debug(string(jsonComponents))
+	logging.Debugf("\nFinal Cache Key: %s", cacheKey)
+
+	return cacheKey, nil
+}

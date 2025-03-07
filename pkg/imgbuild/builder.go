@@ -4,6 +4,7 @@ import (
 	"fmt"
 
 	"github.com/gpuman/thunderbolt/pkg/utils"
+	logging "github.com/sirupsen/logrus"
 )
 
 type ImageBuilder interface {
@@ -20,10 +21,13 @@ func New() (ImageBuilder, error) {
 	var builderType string
 
 	if utils.HasApp("buildah") {
+		// Favor buildah if it's available
 		builderType = "buildah"
 	} else if utils.HasApp("docker") {
 		builderType = "docker"
 	}
+
+	logging.Infof("Using %s to build the image", builderType)
 
 	switch builderType {
 	case "docker":
