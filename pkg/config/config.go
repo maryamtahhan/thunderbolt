@@ -37,6 +37,7 @@ type ThunderboltConfig struct {
 	ThunderboltNamespace string
 	EnabledGPU           bool
 	KubeConfig           string
+	EnabledBaremetal     bool
 }
 
 type Config struct {
@@ -93,6 +94,7 @@ func getThunderboltConfig() ThunderboltConfig {
 	return ThunderboltConfig{
 		ThunderboltNamespace: getConfig("KEPLER_NAMESPACE", defaultNamespace),
 		EnabledGPU:           getBoolConfig("ENABLE_GPU", false),
+		EnabledBaremetal:     getBoolConfig("ENABLE_BAREMETAL", false),
 		KubeConfig:           getConfig("KUBE_CONFIG", defaultKubeConfig),
 	}
 }
@@ -135,6 +137,7 @@ func getConfig(key, defaultValue string) string {
 
 func logBoolConfigs() {
 	logging.Infof("ENABLE_GPU: %t", instance.Thunderbolt.EnabledGPU)
+	logging.Infof("ENABLE_BAREMETAL: %t", instance.Thunderbolt.EnabledBaremetal)
 }
 
 func LogConfigs() {
@@ -145,6 +148,11 @@ func LogConfigs() {
 // SetEnabledGPU enables the exposure of gpu metrics
 func SetEnabledGPU(enabled bool) {
 	instance.Thunderbolt.EnabledGPU = enabled
+}
+
+// SetEnabledBaremetal enables the exposure of gpu metrics
+func SetEnabledBaremetal(enabled bool) {
+	instance.Thunderbolt.EnabledBaremetal = enabled
 }
 
 // SetKubeConfig set kubeconfig file
@@ -158,4 +166,8 @@ func KubeConfig() string {
 
 func IsGPUEnabled() bool {
 	return instance.Thunderbolt.EnabledGPU
+}
+
+func IsBaremetalEnabled() bool {
+	return instance.Thunderbolt.EnabledBaremetal
 }

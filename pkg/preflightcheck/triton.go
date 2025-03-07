@@ -49,6 +49,7 @@ type TritonImageData struct {
 	Arch       string
 	WarpSize   int
 	PtxVersion int
+	DummyKey   string
 }
 
 // Nested struct for the "target" field
@@ -147,6 +148,9 @@ func CompareTritonCacheToGPU(cacheData *TritonCacheData, acc accelerator.Acceler
 }
 
 func CompareTritonCacheImageToGPU(img v1.Image, acc accelerator.Accelerator) error {
+	var dummyKey string
+	var dummyKeyMatches bool
+
 	if img == nil {
 		return errors.New("cache data is nil")
 	}
@@ -174,6 +178,7 @@ func CompareTritonCacheImageToGPU(img v1.Image, acc accelerator.Accelerator) err
 		Backend:  labels["cache.triton.image/backend"],
 		Arch:     labels["cache.triton.image/arch"],
 		WarpSize: warpSize,
+		DummyKey: labels["cache.triton.image/dummy-key"],
 	}
 
 	if ptx, ok := labels["cache.triton.image/ptx-version"]; ok {
@@ -195,11 +200,23 @@ func CompareTritonCacheImageToGPU(img v1.Image, acc accelerator.Accelerator) err
 		}
 	}
 
+	if config.IsBaremetalEnabled() {
+		dummyKey, err = ComputeDummyTritonKey()
+		if err != nil {
+			return fmt.Errorf("failed to calculate a dummy triton key: %w", err)
+		}
+	}
+
 	var hasMatch bool
 	var backendMismatch bool
 
 	for _, gpuInfo := range devInfo {
 		backendMatches := imgData.Backend == gpuInfo.Backend
+		if config.IsBaremetalEnabled() {
+			dummyKeyMatches = imgData.DummyKey == dummyKey
+		} else {
+			dummyKeyMatches = true
+		}
 		archMatches := imgData.Arch == gpuInfo.Arch
 		warpMatches := imgData.WarpSize == gpuInfo.WarpSize
 		ptxMatches := true
@@ -207,18 +224,30 @@ func CompareTritonCacheImageToGPU(img v1.Image, acc accelerator.Accelerator) err
 		if gpuInfo.Backend == "cuda" && imgData.PtxVersion != 0 {
 			ptxMatches = imgData.PtxVersion == gpuInfo.PTXVersion
 			if !ptxMatches {
-				logging.Debugf("PTX version mismatch - cache=%d, gpu=%d", imgData.PtxVersion, gpuInfo.PTXVersion)
+				logging.Debugf("PTX version mismatch - img=%d, gpu=%d", imgData.PtxVersion, gpuInfo.PTXVersion)
 			}
 		}
 
-		if backendMatches && archMatches && warpMatches && ptxMatches {
+		if backendMatches && archMatches && warpMatches && ptxMatches && dummyKeyMatches {
 			hasMatch = true
 			break // No need to check further, at least one match is found
 		}
 
 		if !backendMatches {
 			backendMismatch = true
-			logging.Debugf("Backend mismatch - cache=%s, gpu=%s", imgData.Backend, gpuInfo.Backend)
+			logging.Debugf("Backend mismatch - img=%s, gpu=%s", imgData.Backend, gpuInfo.Backend)
+		}
+
+		if !backendMatches {
+			backendMismatch = true
+			logging.Debugf("Backend mismatch - img=%s, gpu=%s", imgData.Backend, gpuInfo.Backend)
+		}
+
+		if config.IsBaremetalEnabled() {
+			if !dummyKeyMatches {
+				backendMismatch = true
+				logging.Debugf("dummy Cache key mismatch - img=%s, local=%s", imgData.DummyKey, dummyKey)
+			}
 		}
 	}
 

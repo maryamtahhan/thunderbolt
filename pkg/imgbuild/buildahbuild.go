@@ -26,16 +26,23 @@ func (b *buildahBuilder) CreateImage(imageName, cacheDir string) error {
 		return err
 	}
 	defer os.RemoveAll(tmpDir)
+
 	json, err := preflightcheck.FindTritonCacheJSON(cacheDir)
 	if err != nil {
 		// TODO CLEAN UP on failure
 		return fmt.Errorf("failed to retrieve cache json file from %s: %w", cacheDir, err)
 	}
+
 	data, err := preflightcheck.GetTritonCacheJSONData(json)
 	if err != nil {
-		// TODO CLEAN UP on failure
 		return fmt.Errorf("failed to retrieve cache data %s: %w", cacheDir, err)
 	}
+
+	dummyKey, err := preflightcheck.ComputeDummyTritonKey()
+	if err != nil {
+		return fmt.Errorf("failed to calculate a dummy triton key: %w", err)
+	}
+
 	err = copyDir(cacheDir, tmpDir)
 	if err != nil {
 		return fmt.Errorf("error copying contents using cp: %v", err)
@@ -84,6 +91,7 @@ func (b *buildahBuilder) CreateImage(imageName, cacheDir string) error {
 	builder.SetLabel("cache.triton.image/arch", preflightcheck.ConvertArchToString(data.Target.Arch))
 	builder.SetLabel("cache.triton.image/backend", data.Target.Backend)
 	builder.SetLabel("cache.triton.image/warp-size", strconv.Itoa(data.Target.WarpSize))
+	builder.SetLabel("cache.triton.image/dummy-key", dummyKey)
 	if data.PtxVersion != nil && *data.PtxVersion != 0 {
 		builder.SetLabel("cache.triton.image/ptx-version", strconv.Itoa(*data.PtxVersion))
 	}
