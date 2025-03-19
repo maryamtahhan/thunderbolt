@@ -8,6 +8,11 @@ A GPU Kernel runtime container packaging utility inspired by
 ## Build
 
 ```bash
+sudo dnf install gpgme-devel
+sudo dnf install btrfs-progs-devel
+```
+
+```bash
 go build
 ```
 
