@@ -97,7 +97,7 @@ func (b *buildahBuilder) CreateImage(imageName, cacheDir string) error {
 	}
 
 	addOptions := buildah.AddAndCopyOptions{}
-	err = builder.Add("", false, addOptions, tmpDir)
+	err = builder.Add("./io.triton.cache/", false, addOptions, tmpDir)
 	if err != nil {
 		return fmt.Errorf("error adding %s to builder: %v", cacheDir, err)
 	}
