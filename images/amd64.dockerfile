@@ -16,6 +16,9 @@ RUN make build
 FROM public.ecr.aws/docker/library/alpine:3.21.3
 COPY --from=builder /usr/src/thunderbolt/_output/bin/linux_amd64/thunderbolt /thunderbolt
 COPY images/entrypoint.sh /entrypoint.sh
+
+RUN chmod +x /entrypoint.sh
+
 ENTRYPOINT ["/entrypoint.sh"]
 
 # [ podman | docker ] build --progress=plain -t thunderbolt -f images/amd64.dockerfile .
