@@ -23,7 +23,8 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     libbtrfs0 \
     libffi8 \
     libc6 \
- && rm -rf /var/lib/apt/lists/*
+    ca-certificates \
+    && rm -rf /var/lib/apt/lists/*
 
 COPY --from=builder /usr/src/thunderbolt/_output/bin/linux_amd64/thunderbolt /thunderbolt
 COPY images/entrypoint.sh /entrypoint.sh
@@ -31,3 +32,5 @@ COPY images/entrypoint.sh /entrypoint.sh
 RUN chmod +x /entrypoint.sh
 
 ENTRYPOINT ["/entrypoint.sh"]
+
+# [ podman | docker ] build --progress=plain -t thunderbolt -f images/amd64.dockerfile .
