@@ -2,6 +2,7 @@ package imgbuild
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"os"
 	"os/exec"
@@ -20,6 +21,9 @@ import (
 type buildahBuilder struct{}
 
 func (b *buildahBuilder) CreateImage(imageName, cacheDir string) error {
+
+	var allMetadata []CacheMetadataWithDummy
+
 	// Export cacheDir into temporary dir
 	tmpDir, err := os.MkdirTemp("", constants.BuildahCacheDirPrefix)
 	if err != nil {
@@ -27,20 +31,33 @@ func (b *buildahBuilder) CreateImage(imageName, cacheDir string) error {
 	}
 	defer os.RemoveAll(tmpDir)
 
-	json, err := preflightcheck.FindTritonCacheJSON(cacheDir)
+	jsonFiles, err := preflightcheck.FindAllTritonCacheJSON(cacheDir)
 	if err != nil {
-		// TODO CLEAN UP on failure
-		return fmt.Errorf("failed to retrieve cache json file from %s: %w", cacheDir, err)
+		return fmt.Errorf("failed to find cache files: %w", err)
 	}
 
-	data, err := preflightcheck.GetTritonCacheJSONData(json)
-	if err != nil {
-		return fmt.Errorf("failed to retrieve cache data %s: %w", cacheDir, err)
-	}
+	for _, jsonFile := range jsonFiles {
+		data, ret := preflightcheck.GetTritonCacheJSONData(jsonFile)
+		if ret != nil {
+			return fmt.Errorf("failed to extract data from %s: %w", jsonFile, ret)
+		}
+		if data == nil {
+			continue
+		}
 
-	dummyKey, err := preflightcheck.ComputeDummyTritonKey()
-	if err != nil {
-		return fmt.Errorf("failed to calculate a dummy triton key: %w", err)
+		dummyKey, ret := preflightcheck.ComputeDummyTritonKey(data)
+		if ret != nil {
+			return fmt.Errorf("failed to calculate dummy triton key for %s: %w", jsonFile, ret)
+		}
+
+		allMetadata = append(allMetadata, CacheMetadataWithDummy{
+			Hash:       data.Hash,
+			Backend:    data.Target.Backend,
+			Arch:       preflightcheck.ConvertArchToString(data.Target.Arch),
+			WarpSize:   data.Target.WarpSize,
+			PTXVersion: data.PtxVersion,
+			DummyKey:   dummyKey,
+		})
 	}
 
 	err = copyDir(cacheDir, tmpDir)
@@ -66,7 +83,7 @@ func (b *buildahBuilder) CreateImage(imageName, cacheDir string) error {
 	}
 	defer buildStore.Shutdown(false)
 
-	imageWithTag := fmt.Sprintf("%s:%s", imageName, data.Hash)
+	imageWithTag := fmt.Sprintf("%s:%s", imageName, "latest")
 
 	imageRef, err := is.Transport.ParseStoreReference(buildStore, imageWithTag)
 	if err != nil {
@@ -86,18 +103,16 @@ func (b *buildahBuilder) CreateImage(imageName, cacheDir string) error {
 	}
 	defer builder.Delete()
 
-	builder.SetLabel("cache.triton.image/variant", "compat")
-	builder.SetLabel("cache.triton.image/hash", data.Hash)
-	builder.SetLabel("cache.triton.image/arch", preflightcheck.ConvertArchToString(data.Target.Arch))
-	builder.SetLabel("cache.triton.image/backend", data.Target.Backend)
-	builder.SetLabel("cache.triton.image/warp-size", strconv.Itoa(data.Target.WarpSize))
-	builder.SetLabel("cache.triton.image/dummy-key", dummyKey)
-	if data.PtxVersion != nil && *data.PtxVersion != 0 {
-		builder.SetLabel("cache.triton.image/ptx-version", strconv.Itoa(*data.PtxVersion))
+	metadataJSON, err := json.Marshal(allMetadata)
+	if err != nil {
+		return fmt.Errorf("failed to marshal metadata for labels: %w", err)
 	}
 
+	builder.SetLabel("cache.triton.image/variant", "multi")
+	builder.SetLabel("cache.triton.image/entry-count", strconv.Itoa(len(allMetadata)))
+	builder.SetLabel("cache.triton.image/metadata", string(metadataJSON))
 	addOptions := buildah.AddAndCopyOptions{}
-	err = builder.Add("./io.triton.cache/", false, addOptions, tmpDir)
+	err = builder.Add("./io.triton.cache/", false, addOptions, tmpDir+"/.")
 	if err != nil {
 		return fmt.Errorf("error adding %s to builder: %v", cacheDir, err)
 	}
@@ -118,7 +133,7 @@ func (b *buildahBuilder) CreateImage(imageName, cacheDir string) error {
 
 func copyDir(srcDir, dstDir string) error {
 
-	cmd := exec.Command("cp", "-r", srcDir, dstDir)
+	cmd := exec.Command("cp", "-r", srcDir+"/.", dstDir)
 
 	err := cmd.Run()
 	if err != nil {

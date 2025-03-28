@@ -15,6 +15,15 @@ type imgBuilder struct {
 	builder ImageBuilder
 }
 
+type CacheMetadataWithDummy struct {
+	Hash       string `json:"hash"`
+	Backend    string `json:"backend"`
+	Arch       string `json:"arch"`
+	WarpSize   int    `json:"warp_size"`
+	PTXVersion *int   `json:"ptx_version,omitempty"`
+	DummyKey   string `json:"dummy_key"`
+}
+
 // Factory function to create a new ImgBuilder with the specified backend.
 func New() (ImageBuilder, error) {
 	var builder ImageBuilder

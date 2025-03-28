@@ -388,16 +388,6 @@ func extractTritonCacheDirectory(r io.Reader) error {
 				return fmt.Errorf("failed to create file %s: %w", filePath, err)
 			}
 
-			// // If the extracted file is a JSON, check it immediately
-			// if strings.HasSuffix(filePath, ".json") {
-			// 	d, err := preflightcheck.GetTritonCacheJSONData(filePath)
-			// 	if err != nil {
-			// 		// TODO CLEAN UP on failure
-			// 		return nil, fmt.Errorf("failed preflight check on %s: %w", filePath, err)
-			// 	}
-			// 	data = d
-			// }
-
 		default:
 			logging.Debugf("Skipping unsupported type: %c in file %s\n", h.Typeflag, h.Name)
 		}
