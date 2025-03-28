@@ -103,9 +103,8 @@ func sortJSON(input interface{}) string {
 
 type Components map[string]interface{}
 
-// generateTritonCacheKey generates the cache key and its components.
-func generateTritonCacheKey(sourceHash string) (string, Components, error) {
-	components := make(map[string]interface{})
+func generateTritonCacheKey(sourceHash string, data *TritonCacheData) (string, Components, error) {
+	components := make(Components)
 
 	tritonKey, err := getTritonInstallationKey()
 	if err != nil {
@@ -121,19 +120,39 @@ func generateTritonCacheKey(sourceHash string) (string, Components, error) {
 		"hash":    generateSHA256(sourceHash),
 	}
 
-	backendInfo, err := getCurrentTarget()
-	if err != nil {
-		return "", nil, fmt.Errorf("failed to get backend info: %v", err)
+	var backendInfo string
+	if data != nil {
+		// Use provided cache metadata instead of Python target call
+		backendInfo = fmt.Sprintf("%s-%s-%d", data.Target.Backend, ConvertArchToString(data.Target.Arch), data.Target.WarpSize)
+	} else {
+		backendInfo, err = getCurrentTarget()
+		if err != nil {
+			return "", nil, fmt.Errorf("failed to get backend info: %v", err)
+		}
 	}
 	components["backend"] = map[string]string{
 		"info": backendInfo,
 		"hash": generateSHA256(backendInfo),
 	}
 
-	options := map[string]interface{}{
-		"num_warps":  4,
-		"num_stages": 3,
-		"debug":      os.Getenv("TRITON_DEBUG") == "1",
+	// Build options from metadata if available
+	var options map[string]interface{}
+	if data != nil {
+		options = map[string]interface{}{
+			"num_warps":  data.NumWarps,
+			"num_stages": data.NumStages,
+			"debug":      data.Debug,
+		}
+
+		if data.PtxVersion != nil {
+			options["ptx"] = *data.PtxVersion
+		}
+	} else {
+		options = map[string]interface{}{
+			"num_warps":  4,
+			"num_stages": 3,
+			"debug":      os.Getenv("TRITON_DEBUG") == "1",
+		}
 	}
 	sortedOptions := sortJSON(options)
 	components["options"] = map[string]string{
@@ -151,6 +170,7 @@ func generateTritonCacheKey(sourceHash string) (string, Components, error) {
 		"hash":      generateSHA256(sortedEnvVars),
 	}
 
+	// Composite string used for final hash
 	keyComponents := fmt.Sprintf("%s-%s-%s-%s-%s",
 		components["triton_key"],
 		components["source"].(map[string]string)["hash"],
@@ -165,9 +185,9 @@ func generateTritonCacheKey(sourceHash string) (string, Components, error) {
 	return finalHash, components, nil
 }
 
-func ComputeDummyTritonKey() (string, error) {
+func ComputeOneDummyTritonKey() (string, error) {
 	logging.Debug("Generating Triton cache key...")
-	cacheKey, components, err := generateTritonCacheKey("")
+	cacheKey, components, err := generateTritonCacheKey("", nil)
 	if err != nil {
 		return "", fmt.Errorf("critical error during cache key generation: %v", err)
 	}
@@ -177,6 +197,23 @@ func ComputeDummyTritonKey() (string, error) {
 	jsonComponents, _ := json.MarshalIndent(components, "", "  ")
 	logging.Debug(string(jsonComponents))
 	logging.Debugf("\nFinal Cache Key: %s", cacheKey)
+
+	return cacheKey, nil
+}
+
+func ComputeDummyTritonKey(data *TritonCacheData) (string, error) {
+	logging.Debugf("Generating Triton cache key for hash=%s...", data.Hash)
+
+	cacheKey, components, err := generateTritonCacheKey("", data)
+	if err != nil {
+		return "", fmt.Errorf("critical error during cache key generation: %v", err)
+	}
+
+	logging.Debug("\nPer-Cache Dummy Key Components Breakdown:")
+	logging.Debug(strings.Repeat("-", 40))
+	jsonComponents, _ := json.MarshalIndent(components, "", "  ")
+	logging.Debug(string(jsonComponents))
+	logging.Debugf("\nFinal Per-Cache Cache Key: %s", cacheKey)
 
 	return cacheKey, nil
 }

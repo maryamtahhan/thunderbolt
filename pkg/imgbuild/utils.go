@@ -11,7 +11,7 @@ import (
 
 const DockerfileTemplate = `FROM scratch
 LABEL org.opencontainers.image.title={{ .ImageTitle }}
-COPY "{{ .CacheDir }}/" ./io.triton.cache/
+COPY "{{ .CacheDir }}/." ./io.triton.cache/
 `
 
 type DockerfileData struct {

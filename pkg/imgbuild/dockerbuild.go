@@ -17,6 +17,7 @@ package imgbuild
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"io"
 	"os"
@@ -36,25 +37,50 @@ type dockerBuilder struct{}
 func (d *dockerBuilder) CreateImage(imageName, cacheDir string) error {
 	wd, _ := os.Getwd()
 	dockerfilePath := fmt.Sprintf("%s/Dockerfile", wd)
+	tmpCacheDir := fmt.Sprintf("%s/io.triton.cache", wd)
+	var allMetadata []CacheMetadataWithDummy
 
-	json, err := preflightcheck.FindTritonCacheJSON(cacheDir)
+	// Copy cache contents into a directory within build context
+	if err := os.MkdirAll(tmpCacheDir, 0755); err != nil {
+		return fmt.Errorf("failed to create temp cache dir: %w", err)
+	}
+	defer os.RemoveAll(tmpCacheDir)
+
+	err := copyDir(cacheDir+"/.", tmpCacheDir)
 	if err != nil {
-		// TODO CLEAN UP on failure
-		return fmt.Errorf("failed to retrieve cache json file from %s: %w", cacheDir, err)
+		return fmt.Errorf("failed to copy cacheDir into build context: %w", err)
 	}
 
-	jsondata, err := preflightcheck.GetTritonCacheJSONData(json)
+	jsonFiles, err := preflightcheck.FindAllTritonCacheJSON(tmpCacheDir)
 	if err != nil {
-		// TODO CLEAN UP on failure
-		return fmt.Errorf("failed to retrieve cache data %s: %w", cacheDir, err)
+		return fmt.Errorf("failed to find cache files: %w", err)
 	}
 
-	dummyKey, err := preflightcheck.ComputeDummyTritonKey()
-	if err != nil {
-		return fmt.Errorf("failed to calculate a dummy triton key: %w", err)
+	for _, jsonFile := range jsonFiles {
+		data, ret := preflightcheck.GetTritonCacheJSONData(jsonFile)
+		if ret != nil {
+			return fmt.Errorf("failed to extract data from %s: %w", jsonFile, ret)
+		}
+		if data == nil {
+			continue
+		}
+
+		dummyKey, ret := preflightcheck.ComputeDummyTritonKey(data)
+		if ret != nil {
+			return fmt.Errorf("failed to calculate dummy triton key for %s: %w", jsonFile, ret)
+		}
+
+		allMetadata = append(allMetadata, CacheMetadataWithDummy{
+			Hash:       data.Hash,
+			Backend:    data.Target.Backend,
+			Arch:       preflightcheck.ConvertArchToString(data.Target.Arch),
+			WarpSize:   data.Target.WarpSize,
+			PTXVersion: data.PtxVersion,
+			DummyKey:   dummyKey,
+		})
 	}
 
-	err = generateDockerfile(imageName, cacheDir, dockerfilePath)
+	err = generateDockerfile(imageName, tmpCacheDir, dockerfilePath)
 	if err != nil {
 		return fmt.Errorf("failed to generate Dockerfile: %w", err)
 	}
@@ -68,25 +94,23 @@ func (d *dockerBuilder) CreateImage(imageName, cacheDir string) error {
 	if err != nil {
 		return fmt.Errorf("failed to create Docker client: %w", err)
 	}
-	tar, err := archive.TarWithOptions(wd, &archive.TarOptions{IncludeSourceDir: true})
+
+	tar, err := archive.TarWithOptions(wd, &archive.TarOptions{IncludeSourceDir: false})
 	if err != nil {
 		return fmt.Errorf("error creating tar: %w", err)
 	}
 	defer tar.Close()
 
+	metadataJSON, err := json.Marshal(allMetadata)
+	if err != nil {
+		return fmt.Errorf("failed to marshal cache metadata: %w", err)
+	}
+
 	labels := map[string]string{
-		"cache.triton.image/variant":   "compat",
-		"cache.triton.image/hash":      jsondata.Hash,
-		"cache.triton.image/arch":      preflightcheck.ConvertArchToString(jsondata.Target.Arch),
-		"cache.triton.image/backend":   jsondata.BackendName,
-		"cache.triton.image/warp-size": strconv.Itoa(jsondata.Target.WarpSize),
-		"cache.triton.image/dummy-key": dummyKey,
+		"cache.triton.image/metadata":    string(metadataJSON),
+		"cache.triton.image/entry-count": strconv.Itoa(len(allMetadata)),
+		"cache.triton.image/variant":     "multi",
 	}
-
-	if jsondata.PtxVersion != nil && *jsondata.PtxVersion != 0 {
-		labels["cache.triton.image/ptx-version"] = strconv.Itoa(*jsondata.PtxVersion)
-	}
-
 	buildOptions := types.ImageBuildOptions{
 		Dockerfile: "Dockerfile",
 		Tags:       []string{imageName},
@@ -106,7 +130,7 @@ func (d *dockerBuilder) CreateImage(imageName, cacheDir string) error {
 		return fmt.Errorf("error reading build output: %w", err)
 	}
 
-	imageWithTag := fmt.Sprintf("%s:%s", imageName, jsondata.Hash)
+	imageWithTag := fmt.Sprintf("%s:%s", imageName, "latest")
 	err = apiClient.ImageTag(context.Background(), imageName, imageWithTag)
 	if err != nil {
 		return fmt.Errorf("error tagging image: %w", err)

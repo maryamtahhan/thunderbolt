@@ -10,7 +10,15 @@ const (
 )
 
 var (
-	TritonCacheDir = os.Getenv("HOME") + "/.triton/cache"
+	TritonCacheDir string
 	/* Logging */
 	LogLevels = []string{"debug", "info", "warning", "error"} // accepted log levels
 )
+
+func init() {
+	if val := os.Getenv("TRITON_CACHE_DIR"); val != "" {
+		TritonCacheDir = val
+	} else {
+		TritonCacheDir = os.Getenv("HOME") + "/.triton/cache"
+	}
+}

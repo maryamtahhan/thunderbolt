@@ -44,15 +44,12 @@ type TritonCacheData struct {
 }
 
 type TritonImageData struct {
-	Hash       string
-	Backend    string
-	Arch       string
-	WarpSize   int
-	PtxVersion int
-	DummyKey   string
+	Hash       string `json:"hash"`
+	DummyKey   string `json:"dummy_key"`
+	PtxVersion int    `json:"ptx_version,omitempty"`
+	Target
 }
 
-// Nested struct for the "target" field
 type Target struct {
 	Backend  string `json:"backend"`
 	Arch     any    `json:"arch"`
@@ -148,44 +145,36 @@ func CompareTritonCacheToGPU(cacheData *TritonCacheData, acc accelerator.Acceler
 }
 
 func CompareTritonCacheImageToGPU(img v1.Image, acc accelerator.Accelerator) error {
-	var dummyKey string
-	var dummyKeyMatches bool
-
 	if img == nil {
-		return errors.New("cache data is nil")
+		return errors.New("image is nil")
 	}
 	if acc == nil {
-		return errors.New("acc is nil")
+		return errors.New("accelerator is nil")
 	}
 
-	// Get the image's config file
 	configFile, err := img.ConfigFile()
 	if err != nil {
 		return fmt.Errorf("failed to get image config: %v", err)
 	}
 
-	// Extract labels
 	labels := configFile.Config.Labels
-
-	warpSize, err := strconv.Atoi(labels["cache.triton.image/warp-size"])
-	if err != nil {
-		logging.Errorf("Failed to parse warp size: %v", err)
-		return fmt.Errorf("failed to parse warp size: %v", err)
+	if labels == nil {
+		return errors.New("image has no labels")
 	}
 
-	imgData := TritonImageData{
-		Hash:     labels["cache.triton.image/hash"],
-		Backend:  labels["cache.triton.image/backend"],
-		Arch:     labels["cache.triton.image/arch"],
-		WarpSize: warpSize,
-		DummyKey: labels["cache.triton.image/dummy-key"],
+	metadata, ok := labels["cache.triton.image/metadata"]
+	if !ok {
+		return errors.New("missing cache metadata label")
 	}
+	logging.Debugf("Raw metadata label: %s", metadata)
 
-	if ptx, ok := labels["cache.triton.image/ptx-version"]; ok {
-		p, err := strconv.Atoi(ptx)
-		if err == nil {
-			imgData.PtxVersion = p
-		}
+	var metadataList []TritonImageData
+	if err = json.Unmarshal([]byte(metadata), &metadataList); err != nil {
+		return fmt.Errorf("failed to parse metadata label: %v", err)
+	}
+	logging.Debugf("Parsed %d cache entries from image metadata", len(metadataList))
+	for i, e := range metadataList {
+		logging.Debugf("Parsed metadata[%d]: backend=%s arch=%s warp=%d", i, e.Backend, e.Arch, e.WarpSize)
 	}
 
 	var devInfo []devices.TritonGPUInfo
@@ -195,70 +184,75 @@ func CompareTritonCacheImageToGPU(img v1.Image, acc accelerator.Accelerator) err
 			if tritonDevInfo, err := d.GetAllGPUInfo(); err == nil {
 				devInfo = tritonDevInfo
 			} else {
-				return errors.New("couldn't retrieve the GPU Triton info")
+				return fmt.Errorf("couldn't retrieve GPU info: %w", err)
 			}
-		}
-	}
-
-	if config.IsBaremetalEnabled() {
-		dummyKey, err = ComputeDummyTritonKey()
-		if err != nil {
-			return fmt.Errorf("failed to calculate a dummy triton key: %w", err)
 		}
 	}
 
 	var hasMatch bool
 	var backendMismatch bool
 
-	for _, gpuInfo := range devInfo {
-		backendMatches := imgData.Backend == gpuInfo.Backend
-		if config.IsBaremetalEnabled() {
-			dummyKeyMatches = imgData.DummyKey == dummyKey
-		} else {
-			dummyKeyMatches = true
-		}
-		archMatches := imgData.Arch == gpuInfo.Arch
-		warpMatches := imgData.WarpSize == gpuInfo.WarpSize
-		ptxMatches := true
+	for _, entry := range metadataList {
+		dummyKeyMatches := true
 
-		if gpuInfo.Backend == "cuda" && imgData.PtxVersion != 0 {
-			ptxMatches = imgData.PtxVersion == gpuInfo.PTXVersion
-			if !ptxMatches {
-				logging.Debugf("PTX version mismatch - img=%d, gpu=%d", imgData.PtxVersion, gpuInfo.PTXVersion)
+		if config.IsBaremetalEnabled() {
+			cacheData := &TritonCacheData{
+				Hash: entry.Hash,
+				Target: Target{
+					Backend:  entry.Backend,
+					Arch:     entry.Arch,
+					WarpSize: entry.WarpSize,
+				},
+				PtxVersion: &entry.PtxVersion,
+			}
+
+			expectedDummyKey, err := ComputeDummyTritonKey(cacheData)
+			if err != nil {
+				return fmt.Errorf("failed to compute dummy key for image entry: %w", err)
+			}
+
+			dummyKeyMatches = entry.DummyKey == expectedDummyKey
+			if !dummyKeyMatches {
+				logging.Debugf("Dummy key mismatch (baremetal): image=%s, expected=%s", entry.DummyKey, expectedDummyKey)
 			}
 		}
 
-		if backendMatches && archMatches && warpMatches && ptxMatches && dummyKeyMatches {
-			hasMatch = true
-			break // No need to check further, at least one match is found
-		}
+		for _, gpuInfo := range devInfo {
+			logging.Debugf("Checking entry: backend=%s arch=%s warp=%d",
+				entry.Backend, entry.Arch, entry.WarpSize)
+			logging.Debugf("Against GPU: backend=%s arch=%s warp=%d",
+				gpuInfo.Backend, gpuInfo.Arch, gpuInfo.WarpSize)
+			backendMatches := entry.Backend == gpuInfo.Backend
+			archMatches := entry.Arch == gpuInfo.Arch
+			warpMatches := entry.WarpSize == gpuInfo.WarpSize
 
-		if !backendMatches {
-			backendMismatch = true
-			logging.Debugf("Backend mismatch - img=%s, gpu=%s", imgData.Backend, gpuInfo.Backend)
-		}
+			ptxMatches := true
+			if entry.Backend == "cuda" {
+				ptxMatches = entry.PtxVersion == gpuInfo.PTXVersion
+				if !ptxMatches {
+					logging.Debugf("PTX version mismatch - image=%d, gpu=%d", entry.PtxVersion, gpuInfo.PTXVersion)
+				}
+			}
 
-		if !backendMatches {
-			backendMismatch = true
-			logging.Debugf("Backend mismatch - img=%s, gpu=%s", imgData.Backend, gpuInfo.Backend)
-		}
+			if backendMatches && archMatches && warpMatches && ptxMatches && dummyKeyMatches {
+				logging.Debugf("Cache match found: hash=%s", entry.Hash)
+				hasMatch = true
+				break
+			}
 
-		if config.IsBaremetalEnabled() {
-			if !dummyKeyMatches {
+			if !backendMatches {
 				backendMismatch = true
-				logging.Debugf("dummy Cache key mismatch - img=%s, local=%s", imgData.DummyKey, dummyKey)
+				logging.Debugf("Backend mismatch - img=%s, gpu=%s", entry.Backend, gpuInfo.Backend)
 			}
 		}
 	}
 
 	if hasMatch {
-		return nil // At least one GPU matches all fields, return no error
+		return nil
 	}
-
 	if backendMismatch {
-		return fmt.Errorf("incompatibility detected: backendMismatch=%t", backendMismatch)
+		return fmt.Errorf("incompatibility detected: backend mismatch")
 	}
-
 	return fmt.Errorf("no compatible GPU found")
 }
 
@@ -287,45 +281,35 @@ func checkFirstKeyHash(filePath string) (bool, error) {
 	return true, nil
 }
 
-// FindTritonCacheJSON searches for JSON files in a directory and subdirectories
-func FindTritonCacheJSON(rootDir string) (string, error) {
-	var foundFile string
+func FindAllTritonCacheJSON(rootDir string) ([]string, error) {
+	var files []string
 
-	// Walk through the directory
 	err := filepath.Walk(rootDir, func(path string, info os.FileInfo, err error) error {
 		if err != nil {
 			return err
 		}
 
-		logging.Debugf("filepath:%v", info.Name())
-		// Check if the file has a .json extension
 		if !info.IsDir() && filepath.Ext(path) == ".json" {
-			logging.Debugf("GOT A JSON FILE:%v", info.Name())
-
 			match, err := checkFirstKeyHash(path)
 			if err != nil {
 				log.Printf("Error checking file %s: %v\n", path, err)
 				return nil
 			}
-
 			if match {
-				foundFile = path
-				return filepath.SkipDir // Stop searching once found
+				files = append(files, path)
 			}
 		}
-
 		return nil
 	})
 
 	if err != nil {
-		return "", err
+		return nil, err
+	}
+	if len(files) == 0 {
+		return nil, fmt.Errorf("no valid Triton cache JSON files found in %s", rootDir)
 	}
 
-	if foundFile == "" {
-		return "", fmt.Errorf("no matching Triton cache JSON found")
-	}
-
-	return foundFile, nil
+	return files, nil
 }
 
 func ConvertArchToString(arch any) string {
