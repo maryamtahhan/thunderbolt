@@ -24,7 +24,21 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     libffi8 \
     libc6 \
     ca-certificates \
-    && rm -rf /var/lib/apt/lists/*
+    wget \
+    gnupg2 \
+    curl \
+    lsb-release \
+    software-properties-common \
+    python3-setuptools \
+    python3-wheel \
+ && rm -rf /var/lib/apt/lists/*
+
+# Install ROCm apt repo
+RUN wget https://repo.radeon.com/amdgpu-install/6.3.3/ubuntu/jammy/amdgpu-install_6.3.60303-1_all.deb && \
+    apt-get update && \
+    apt-get install -y ./amdgpu-install_6.3.60303-1_all.deb && \
+    amdgpu-install --usecase=rocm --no-dkms -y && \
+    rm -rf /var/lib/apt/lists/*
 
 COPY --from=builder /usr/src/thunderbolt/_output/bin/linux_amd64/thunderbolt /thunderbolt
 COPY images/entrypoint.sh /entrypoint.sh
