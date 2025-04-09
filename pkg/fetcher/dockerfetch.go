@@ -9,8 +9,8 @@ import (
 
 	"github.com/docker/docker/client"
 	v1 "github.com/google/go-containerregistry/pkg/v1"
-	"github.com/gpuman/thunderbolt/pkg/constants"
 	logging "github.com/sirupsen/logrus"
+	"github.com/tkdk/cargohold/pkg/constants"
 )
 
 type dockerFetcher struct{}

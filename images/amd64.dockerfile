@@ -1,7 +1,7 @@
 FROM public.ecr.aws/docker/library/golang:1.24 AS builder
 
-COPY . /usr/src/thunderbolt
-WORKDIR /usr/src/thunderbolt
+COPY . /usr/src/cargohold
+WORKDIR /usr/src/cargohold
 
 ENV CGO_ENABLED=1
 RUN apt-get update && apt-get install -y --no-install-recommends \
@@ -40,11 +40,11 @@ RUN wget https://repo.radeon.com/amdgpu-install/6.3.3/ubuntu/jammy/amdgpu-instal
     amdgpu-install --usecase=rocm --no-dkms -y && \
     rm -rf /var/lib/apt/lists/*
 
-COPY --from=builder /usr/src/thunderbolt/_output/bin/linux_amd64/thunderbolt /thunderbolt
+COPY --from=builder /usr/src/cargohold/_output/bin/linux_amd64/cargohold /cargohold
 COPY images/entrypoint.sh /entrypoint.sh
 
 RUN chmod +x /entrypoint.sh
 
 ENTRYPOINT ["/entrypoint.sh"]
 
-# [ podman | docker ] build --progress=plain -t quay.io/mtahhan/thunderbolt -f images/amd64.dockerfile .
+# [ podman | docker ] build --progress=plain -t quay.io/mtahhan/cargohold -f images/amd64.dockerfile .

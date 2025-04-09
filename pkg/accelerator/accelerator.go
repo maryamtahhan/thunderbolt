@@ -19,9 +19,9 @@ import (
 	"sync"
 	"time"
 
-	"github.com/gpuman/thunderbolt/pkg/accelerator/devices"
 	"github.com/pkg/errors"
 	logging "github.com/sirupsen/logrus"
+	"github.com/tkdk/cargohold/pkg/accelerator/devices"
 )
 
 var (

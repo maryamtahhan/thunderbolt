@@ -7,9 +7,9 @@ import (
 	"os/exec"
 	"strconv"
 
-	"github.com/gpuman/thunderbolt/pkg/config"
-	"github.com/gpuman/thunderbolt/pkg/utils"
 	logging "github.com/sirupsen/logrus"
+	"github.com/tkdk/cargohold/pkg/config"
+	"github.com/tkdk/cargohold/pkg/utils"
 )
 
 const rocmHwType = config.GPU

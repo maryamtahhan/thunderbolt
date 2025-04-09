@@ -18,9 +18,9 @@ package config
 
 const (
 	GPU               = "gpu"
-	defaultNamespace  = "thunderbolt"
+	defaultNamespace  = "cargohold"
 	defaultKubeConfig = ""
 )
 
-var ConfDir string = "/tmp/thunderbolt/"
-var ConfFile string = "thunderbolt.config"
+var ConfDir string = "/tmp/cargohold/"
+var ConfFile string = "cargohold.config"

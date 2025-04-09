@@ -1,6 +1,6 @@
-# Thunderbolt
+# CargoHold
 
-<img src="logo/thunderbolt.jpeg" alt="thunderbolt" width="20%" height="auto">
+<img src="logo/cargo-hold.png" alt="cargohold" width="20%" height="auto">
 
 A GPU Kernel runtime container packaging utility inspired by
 [WASM](https://github.com/solo-io/wasm/blob/master/spec/README.md).
@@ -19,17 +19,17 @@ go build
 ## Usage
 
 ```bash
-$ ./_output/bin/linux_amd64/thunderbolt -h
+$ ./_output/bin/linux_amd64/cargohold -h
 A GPU Kernel runtime container image management utility
 
 Usage:
-  thunderbolt [flags]
+  cargohold [flags]
 
 Flags:
   -c, --create             Create OCI image
   -d, --dir string         Triton Cache Directory
   -e, --extract            Extract a Triton cache from an OCI image
-  -h, --help               help for thunderbolt
+  -h, --help               help for cargohold
   -i, --image string       OCI image name
   -l, --log-level string   Set the logging verbosity level (debug, info, warning or error)
 ```
@@ -61,7 +61,7 @@ To extract the Triton Cache for the
 tutorial from [Triton](https://github.com/triton-lang/triton), run the following:
 
 ```bash
-./_output/bin/linux_amd64/thunderbolt -e -i quay.io/mtahhan/triton-cache:01-vector-add-latest
+./_output/bin/linux_amd64/cargohold -e -i quay.io/mtahhan/triton-cache:01-vector-add-latest
 Img fetched successfully!!!!!!!!
 Img Digest: sha256:b6d7703261642df0bf95175a64a01548eb4baf265c5755c30ede0fea03cd5d97
 Img Size: 525
@@ -74,10 +74,10 @@ container image and copy it to  `~/.triton/cache/`.
 To Create an OCI image for a Triton Cache using docker run the following:
 
 ```bash
-./_output/bin/linux_amd64/thunderbolt -c -i quay.io/mtahhan/01-vector-add-cache -d example/01-vector-add-cache
+./_output/bin/linux_amd64/cargohold -c -i quay.io/mtahhan/01-vector-add-cache -d example/01-vector-add-cache
 INFO[2025-03-28 06:44:28] baremetalFlag false
 INFO[2025-03-28 06:44:28] Using docker to build the image
-INFO[2025-03-28 06:44:28] Dockerfile generated successfully at /home/mtahhan/thunderbolt/Dockerfile
+INFO[2025-03-28 06:44:28] Dockerfile generated successfully at /home/mtahhan/cargohold/Dockerfile
 {"stream":"Step 1/6 : FROM scratch"}
 {"stream":"\n"}
 {"stream":" ---\u003e \n"}
@@ -154,7 +154,7 @@ To inspect the docker image with Skopeo
 The build output is shown below.
 
 ```bash
- ./_output/bin/linux_amd64/thunderbolt -c -i quay.io/mtahhan/01-vector-add-cache -d example/01-vector-add-cache
+ ./_output/bin/linux_amd64/cargohold -c -i quay.io/mtahhan/01-vector-add-cache -d example/01-vector-add-cache
 INFO[2025-03-28 10:20:11] baremetalFlag false
 INFO[2025-03-28 10:20:11] Using buildah to build the image
 INFO[2025-03-28 10:20:11] Image built! 9def3c99415d1716e94eb6a2b010b2010c80de81c78608612e4bec1c21d27e62

@@ -1,4 +1,4 @@
-all: thunderbolt
+all: cargohold
 
 ##@ Help
 
@@ -39,7 +39,7 @@ GOARCH := $(shell go env GOARCH)
 GOENV = GO111MODULE="" \
 				GOOS=$(GOOS) \
 				GOARCH=$(GOARCH)
-PKG_BUILD="github.com/gpuman/thunderbolt/pkg/build"
+PKG_BUILD="github.com/tkdk/cargohold/pkg/build"
 LDFLAGS := $(LDFLAGS) \
 		-X $(PKG_BUILD).Version=$(VERSION) \
 		-X $(PKG_BUILD).Revision=$(GIT_SHA) \
@@ -63,19 +63,19 @@ PROJECT_DIR := $(shell dirname $(abspath $(firstword $(MAKEFILE_LIST))))
 base_dir := $(patsubst %/,%,$(dir $(realpath $(firstword $(MAKEFILE_LIST)))))
 
 ##@ Default
-thunderbolt: build ## Build thunderbolt.
-.PHONY: thunderbolt
+cargohold: build ## Build cargohold.
+.PHONY: cargohold
 
 ##@ General build
 build: clean_build_local _build_local  ##  Build binary and copy to $(OUTPUT_DIR)/bin
 .PHONY: build
 
-_build_local:  ##  Build Thunderbolt binary locally.
+_build_local:  ##  Build CargoHold binary locally.
 	@mkdir -p "$(BUILD_BINDIR)/$(GOOS)_$(GOARCH)"
 	+@$(GOENV) go build \
 		-v -tags ${GO_BUILD_TAGS} \
 		-ldflags "$(LDFLAGS)" \
-		-o $(BUILD_BINDIR)/$(GOOS)_$(GOARCH)/thunderbolt \
+		-o $(BUILD_BINDIR)/$(GOOS)_$(GOARCH)/cargohold \
 		./cmd/main.go
 
 ## toolkit ###
@@ -94,6 +94,6 @@ clean_build_local: ## Clean local build directory
 format:
 	@echo "******     Go Format     ******"
 	@echo
-	go fmt github.com/gpuman/thunderbolt/...
+	go fmt github.com/tkdk/cargohold/...
 	@echo
 	@echo

@@ -22,13 +22,13 @@ import (
 
 	"github.com/containers/buildah"
 	"github.com/containers/storage/pkg/unshare"
-	"github.com/gpuman/thunderbolt/pkg/config"
-	"github.com/gpuman/thunderbolt/pkg/fetcher"
-	"github.com/gpuman/thunderbolt/pkg/imgbuild"
-	"github.com/gpuman/thunderbolt/pkg/logformat"
-	"github.com/gpuman/thunderbolt/pkg/utils"
 	logging "github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
+	"github.com/tkdk/cargohold/pkg/config"
+	"github.com/tkdk/cargohold/pkg/fetcher"
+	"github.com/tkdk/cargohold/pkg/imgbuild"
+	"github.com/tkdk/cargohold/pkg/logformat"
+	"github.com/tkdk/cargohold/pkg/utils"
 )
 
 const (
@@ -83,7 +83,7 @@ func main() {
 	}
 
 	var rootCmd = &cobra.Command{
-		Use:   "thunderbolt",
+		Use:   "cargohold",
 		Short: "A GPU Kernel runtime container image management utility",
 		PersistentPreRun: func(cmd *cobra.Command, args []string) {
 			// logging

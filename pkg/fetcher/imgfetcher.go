@@ -30,13 +30,13 @@ import (
 	v1 "github.com/google/go-containerregistry/pkg/v1"
 	"github.com/google/go-containerregistry/pkg/v1/tarball"
 	"github.com/google/go-containerregistry/pkg/v1/types"
-	"github.com/gpuman/thunderbolt/pkg/accelerator"
-	"github.com/gpuman/thunderbolt/pkg/config"
-	"github.com/gpuman/thunderbolt/pkg/constants"
-	"github.com/gpuman/thunderbolt/pkg/preflightcheck"
-	"github.com/gpuman/thunderbolt/pkg/utils"
 	"github.com/hashicorp/go-multierror"
 	logging "github.com/sirupsen/logrus"
+	"github.com/tkdk/cargohold/pkg/accelerator"
+	"github.com/tkdk/cargohold/pkg/config"
+	"github.com/tkdk/cargohold/pkg/constants"
+	"github.com/tkdk/cargohold/pkg/preflightcheck"
+	"github.com/tkdk/cargohold/pkg/utils"
 )
 
 // A quick list of TODOS:
@@ -268,7 +268,7 @@ func extractOCIArtifactImg(img v1.Image) error {
 // extractDockerImg extracts the Triton Kernel Cache from the
 // *compat* variant GPU Kernel Cache/Binary image with the standard Docker
 // media type: application/vnd.docker.image.rootfs.diff.tar.gzip.
-// https://github.com/maryamtahhan/thunderbolt/blob/main/spec-compat.md
+// https://github.com/maryamtahhan/cargohold/blob/main/spec-compat.md
 func extractDockerImg(img v1.Image) error {
 	layers, err := img.Layers()
 	if err != nil {
@@ -306,7 +306,7 @@ func extractDockerImg(img v1.Image) error {
 
 // extractOCIStandardImg extracts the Triton Kernel Cache from the
 // *compat* variant Triton Kernel image with the standard OCI media type: application/vnd.oci.image.layer.v1.tar+gzip.
-// https://github.com/maryamtahhan/thunderbolt/blob/main/spec-compat.md
+// https://github.com/maryamtahhan/cargohold/blob/main/spec-compat.md
 func extractOCIStandardImg(img v1.Image) error {
 	layers, err := img.Layers()
 	if err != nil {

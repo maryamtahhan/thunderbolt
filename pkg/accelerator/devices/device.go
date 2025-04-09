@@ -19,8 +19,8 @@ import (
 	"errors"
 	"sync"
 
-	"github.com/gpuman/thunderbolt/pkg/config"
 	logging "github.com/sirupsen/logrus"
+	"github.com/tkdk/cargohold/pkg/config"
 	"golang.org/x/exp/maps"
 )
 

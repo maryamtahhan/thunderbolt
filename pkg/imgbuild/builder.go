@@ -3,8 +3,8 @@ package imgbuild
 import (
 	"fmt"
 
-	"github.com/gpuman/thunderbolt/pkg/utils"
 	logging "github.com/sirupsen/logrus"
+	"github.com/tkdk/cargohold/pkg/utils"
 )
 
 type ImageBuilder interface {

@@ -1,4 +1,4 @@
-module github.com/gpuman/thunderbolt
+module github.com/tkdk/cargohold
 
 go 1.24.0
 

@@ -33,16 +33,16 @@ var (
 )
 
 // Configuration structs
-type ThunderboltConfig struct {
-	ThunderboltNamespace string
-	EnabledGPU           bool
-	KubeConfig           string
-	EnabledBaremetal     bool
+type CargoHoldConfig struct {
+	CargoHoldNamespace string
+	EnabledGPU         bool
+	KubeConfig         string
+	EnabledBaremetal   bool
 }
 
 type Config struct {
 	KernelVersion float32
-	Thunderbolt   ThunderboltConfig
+	CargoHold     CargoHoldConfig
 }
 
 func newConfig() (*Config, error) {
@@ -70,7 +70,7 @@ func newConfig() (*Config, error) {
 
 	// Proceed to create and return the Config instance
 	return &Config{
-		Thunderbolt:   getThunderboltConfig(),
+		CargoHold:     getCargoHoldConfig(),
 		KernelVersion: float32(0),
 	}, nil
 }
@@ -90,12 +90,12 @@ func Initialize(baseDir string) (*Config, error) {
 	return instance, err
 }
 
-func getThunderboltConfig() ThunderboltConfig {
-	return ThunderboltConfig{
-		ThunderboltNamespace: getConfig("KEPLER_NAMESPACE", defaultNamespace),
-		EnabledGPU:           getBoolConfig("ENABLE_GPU", false),
-		EnabledBaremetal:     getBoolConfig("ENABLE_BAREMETAL", false),
-		KubeConfig:           getConfig("KUBE_CONFIG", defaultKubeConfig),
+func getCargoHoldConfig() CargoHoldConfig {
+	return CargoHoldConfig{
+		CargoHoldNamespace: getConfig("KEPLER_NAMESPACE", defaultNamespace),
+		EnabledGPU:         getBoolConfig("ENABLE_GPU", false),
+		EnabledBaremetal:   getBoolConfig("ENABLE_BAREMETAL", false),
+		KubeConfig:         getConfig("KUBE_CONFIG", defaultKubeConfig),
 	}
 }
 
@@ -136,8 +136,8 @@ func getConfig(key, defaultValue string) string {
 }
 
 func logBoolConfigs() {
-	logging.Infof("ENABLE_GPU: %t", instance.Thunderbolt.EnabledGPU)
-	logging.Infof("ENABLE_BAREMETAL: %t", instance.Thunderbolt.EnabledBaremetal)
+	logging.Infof("ENABLE_GPU: %t", instance.CargoHold.EnabledGPU)
+	logging.Infof("ENABLE_BAREMETAL: %t", instance.CargoHold.EnabledBaremetal)
 }
 
 func LogConfigs() {
@@ -147,27 +147,27 @@ func LogConfigs() {
 
 // SetEnabledGPU enables the exposure of gpu metrics
 func SetEnabledGPU(enabled bool) {
-	instance.Thunderbolt.EnabledGPU = enabled
+	instance.CargoHold.EnabledGPU = enabled
 }
 
 // SetEnabledBaremetal enables the exposure of gpu metrics
 func SetEnabledBaremetal(enabled bool) {
-	instance.Thunderbolt.EnabledBaremetal = enabled
+	instance.CargoHold.EnabledBaremetal = enabled
 }
 
 // SetKubeConfig set kubeconfig file
 func SetKubeConfig(k string) {
-	instance.Thunderbolt.KubeConfig = k
+	instance.CargoHold.KubeConfig = k
 }
 
 func KubeConfig() string {
-	return instance.Thunderbolt.KubeConfig
+	return instance.CargoHold.KubeConfig
 }
 
 func IsGPUEnabled() bool {
-	return instance.Thunderbolt.EnabledGPU
+	return instance.CargoHold.EnabledGPU
 }
 
 func IsBaremetalEnabled() bool {
-	return instance.Thunderbolt.EnabledBaremetal
+	return instance.CargoHold.EnabledBaremetal
 }

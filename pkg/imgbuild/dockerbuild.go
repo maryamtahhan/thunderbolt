@@ -26,9 +26,9 @@ import (
 	"github.com/docker/docker/api/types"
 	"github.com/docker/docker/client"
 	"github.com/docker/docker/pkg/archive"
-	"github.com/gpuman/thunderbolt/pkg/preflightcheck"
-	"github.com/gpuman/thunderbolt/pkg/utils"
 	logging "github.com/sirupsen/logrus"
+	"github.com/tkdk/cargohold/pkg/preflightcheck"
+	"github.com/tkdk/cargohold/pkg/utils"
 )
 
 type dockerBuilder struct{}
